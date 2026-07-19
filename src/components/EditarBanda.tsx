@@ -9,18 +9,15 @@ export default function EditarBanda() {
   const [autenticado, setAutenticado] = useState(false);
   const [bandaId, setBandaId] = useState('');
   
-  // Estados de los campos
   const [nombre, setNombre] = useState('');
   const [genero, setGenero] = useState('');
   const [historia, setHistoria] = useState('');
-  const [plan, setPlan] = useState<'gratis' | 'premium'>('gratis');
   const [integrantes, setIntegrantes] = useState<IntegranteInput[]>([{ nombre: '', instrumento: '' }]);
   const [canciones, setCanciones] = useState<CancionInput[]>([{ titulo: '', spotify_embed_url: '', youtube_embed_url: '' }]);
   
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
 
-  // Leer si el token viene directo en la URL (?token=xxxx)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenUrl = urlParams.get('token');
@@ -31,33 +28,63 @@ export default function EditarBanda() {
   }, []);
 
   const cargarDatosBanda = async (token: string) => {
+    const tokenLimpio = token.trim();
+
+    if (!tokenLimpio) {
+      alert("Por favor, introduce un código secreto.");
+      return;
+    }
+
     setCargando(true);
     setMensaje(null);
 
-    const { data: banda, error: errorBanda } = await supabase
-      .from('bandas')
-      .select(`
-        id, nombre, genero, historia, plan,
-        integrantes ( nombre, instrumento ),
-        canciones ( titulo, spotify_embed_url, youtube_embed_url )
-      `)
-      .eq('access_token', token)
-      .single();
+    try {
+      // Hacemos una consulta base súper simple, sin subtablas, para descartar errores de relación
+      const { data, error: errorBanda } = await supabase
+        .from('bandas')
+        .select('id, nombre, clave_edicion')
+        .eq('clave_edicion', tokenLimpio);
 
-    if (errorBanda || !banda) {
-      setMensaje({ tipo: 'error', texto: 'Código secreto inválido. Revisalo e intentalo de nuevo.' });
-      setAutenticado(false);
-    } else {
-      setBandaId(banda.id);
-      setNombre(banda.nombre);
-      setGenero(banda.genero);
-      setHistoria(banda.historia || '');
-      setPlan(banda.plan as 'gratis' | 'premium');
-      if (banda.integrantes && banda.integrantes.length > 0) setIntegrantes(banda.integrantes as any);
-      if (banda.canciones && banda.canciones.length > 0) setCanciones(banda.canciones as any);
-      setAutenticado(true);
+      // ESTO VA A LEVANTAR UNA VENTANA EMERGENTE SÍ O SÍ EN TU PANTALLA
+      alert(
+        "DIAGNÓSTICO:\n\n" +
+        "Clave enviada: " + tokenLimpio + "\n" +
+        "Error de Supabase: " + (errorBanda ? errorBanda.message : "Ninguno") + "\n" +
+        "Registros encontrados: " + (data ? data.length : 0) + "\n" +
+        "Datos: " + JSON.stringify(data)
+      );
+
+      if (errorBanda || !data || data.length === 0) {
+        setMensaje({ tipo: 'error', texto: 'Código secreto inválido. Revisalo e intentalo de nuevo.' });
+        setAutenticado(false);
+      } else {
+        // Si encuentra la banda base, volvemos a pedir los datos completos con sus relaciones
+        const { data: bandaCompleta } = await supabase
+          .from('bandas')
+          .select(`
+            id, nombre, genero, historia,
+            integrantes ( nombre, instrumento ),
+            canciones ( titulo, spotify_embed_url, youtube_embed_url )
+          `)
+          .eq('clave_edicion', tokenLimpio)
+          .single();
+
+        if (bandaCompleta) {
+          setBandaId(bandaCompleta.id);
+          setNombre(bandaCompleta.nombre);
+          setGenero(bandaCompleta.genero);
+          setHistoria(bandaCompleta.historia || '');
+          if (bandaCompleta.integrantes) setIntegrantes(bandaCompleta.integrantes as any);
+          if (bandaCompleta.canciones) setCanciones(bandaCompleta.canciones as any);
+          setAutenticado(true);
+          setMensaje(null);
+        }
+      }
+    } catch (err: any) {
+      alert("Error en catch: " + err.message);
+    } finally {
+      setCargando(false);
     }
-    setCargando(false);
   };
 
   const handleGuardarCambios = async (e: React.FormEvent) => {
@@ -66,13 +93,9 @@ export default function EditarBanda() {
     setMensaje(null);
 
     try {
-      // 1. Actualizar datos de la banda
       await supabase.from('bandas').update({ nombre, genero, historia }).eq('id', bandaId);
 
-      // 2. Actualizar Integrantes (Borrar viejos e insertar nuevos)
       await supabase.from('integrantes').delete().eq('banda_id', bandaId);
-      
-      // MODIFICACIÓN: Guarda instrumentos para cualquiera de los dos planes
       const nuevosIntegrantes = integrantes.filter(i => i.nombre.trim() !== '').map(i => ({
         banda_id: bandaId,
         nombre: i.nombre,
@@ -80,17 +103,14 @@ export default function EditarBanda() {
       }));
       if (nuevosIntegrantes.length > 0) await supabase.from('integrantes').insert(nuevosIntegrantes);
 
-      // 3. Actualizar Canciones (Solo Premium)
       await supabase.from('canciones').delete().eq('banda_id', bandaId);
-      if (plan === 'premium') {
-        const nuevasCanciones = canciones.filter(c => c.titulo.trim() !== '').map(c => ({
-          banda_id: bandaId,
-          titulo: c.titulo,
-          spotify_embed_url: c.spotify_embed_url || null,
-          youtube_embed_url: c.youtube_embed_url || null
-        }));
-        if (nuevasCanciones.length > 0) await supabase.from('canciones').insert(nuevasCanciones);
-      }
+      const nuevasCanciones = canciones.filter(c => c.titulo.trim() !== '').map(c => ({
+        banda_id: bandaId,
+        titulo: c.titulo,
+        spotify_embed_url: c.spotify_embed_url || null,
+        youtube_embed_url: c.youtube_embed_url || null
+      }));
+      if (nuevasCanciones.length > 0) await supabase.from('canciones').insert(nuevasCanciones);
 
       setMensaje({ tipo: 'exito', texto: '¡Tu perfil musical ha sido actualizado con éxito!' });
     } catch (error: any) {
@@ -105,17 +125,23 @@ export default function EditarBanda() {
       <div style={{ maxWidth: '500px', margin: '2rem auto', padding: '1.5rem', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#fff', color: '#000' }}>
         <h3>🔑 Modificar mi Banda</h3>
         <p style={{ fontSize: '14px', color: '#666' }}>Introduce el código secreto o accede mediante el link que se te dio al registrar la banda.</p>
-        <input 
-          type="text" 
-          placeholder="Pegar código secreto aquí..." 
-          value={tokenInput} 
-          onChange={(e) => setTokenInput(e.target.value)} 
-          style={{ width: '100%', padding: '10px', marginBottom: '10px', boxSizing: 'border-box' }}
-        />
-        <button onClick={() => cargarDatosBanda(tokenInput)} disabled={cargando} style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
-          {cargando ? 'Verificando...' : 'Editar Perfil'}
-        </button>
-        {mensaje && <p style={{ color: 'red', marginTop: '10px' }}>{mensaje.texto}</p>}
+        
+        {/* Agregamos el formulario nativo controlado para evitar fallos de input */}
+        <form onSubmit={(e) => { e.preventDefault(); cargarDatosBanda(tokenInput); }}>
+          <input 
+            type="text" 
+            placeholder="Pegar código secreto aquí..." 
+            value={tokenInput} 
+            onChange={(e) => setTokenInput(e.target.value)} 
+            style={{ width: '100%', padding: '10px', marginBottom: '10px', boxSizing: 'border-box' }}
+            required
+          />
+          <button type="submit" disabled={cargando} style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+            {cargando ? 'Verificando...' : 'Editar Perfil'}
+          </button>
+        </form>
+        
+        {mensaje && <p style={{ color: 'red', marginTop: '10px', fontWeight: 'bold' }}>{mensaje.texto}</p>}
       </div>
     );
   }
@@ -128,18 +154,17 @@ export default function EditarBanda() {
       <form onSubmit={handleGuardarCambios}>
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ fontWeight: 'bold' }}>Nombre de la Banda</label>
-          <input type="text" required value={nombre} onChange={(e) => setNombre(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px' }}/>
+          <input type="text" required value={nombre} onChange={(e) => setNombre(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px', boxSizing: 'border-box' }}/>
         </div>
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ fontWeight: 'bold' }}>Género</label>
-          <input type="text" required value={genero} onChange={(e) => setGenero(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px' }}/>
+          <input type="text" required value={genero} onChange={(e) => setGenero(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px', boxSizing: 'border-box' }}/>
         </div>
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ fontWeight: 'bold' }}>Biografía / Historia</label>
-          <textarea rows={4} value={historia} onChange={(e) => setHistoria(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px' }}/>
+          <textarea rows={4} value={historia} onChange={(e) => setHistoria(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px', boxSizing: 'border-box' }}/>
         </div>
 
-        {/* Integrantes dinámicos (Permite instrumentos para todos) */}
         <div style={{ marginBottom: '1.5rem', padding: '10px', border: '1px solid #ddd' }}>
           <h4>Integrantes actuales</h4>
           {integrantes.map((int, i) => (
@@ -147,7 +172,6 @@ export default function EditarBanda() {
               <input type="text" placeholder="Nombre" value={int.nombre} onChange={(e) => {
                 const n = [...integrantes]; n[i].nombre = e.target.value; setIntegrantes(n);
               }} style={{ flex: 1, padding: '6px' }}/>
-              
               <input type="text" placeholder="Instrumento" value={int.instrumento || ''} onChange={(e) => {
                 const n = [...integrantes]; n[i].instrumento = e.target.value; setIntegrantes(n);
               }} style={{ flex: 1, padding: '6px' }}/>
@@ -156,26 +180,23 @@ export default function EditarBanda() {
           <button type="button" onClick={() => setIntegrantes([...integrantes, { nombre: '', instrumento: '' }])}>+ Añadir Integrante</button>
         </div>
 
-        {/* Canciones (Solo Premium) */}
-        {plan === 'premium' && (
-          <div style={{ marginBottom: '1.5rem', padding: '10px', border: '1px solid #ffd700', backgroundColor: '#fffdf0' }}>
-            <h4>Multimedia 👑</h4>
-            {canciones.map((can, i) => (
-              <div key={i} style={{ marginBottom: '10px' }}>
-                <input type="text" placeholder="Título" value={can.titulo} onChange={(e) => {
-                  const n = [...canciones]; n[i].titulo = e.target.value; setCanciones(n);
-                }} style={{ width: '100%', padding: '6px', marginBottom: '3px' }}/>
-                <input type="text" placeholder="Link Spotify" value={can.spotify_embed_url || ''} onChange={(e) => {
-                  const n = [...canciones]; n[i].spotify_embed_url = e.target.value; setCanciones(n);
-                }} style={{ width: '100%', padding: '6px', marginBottom: '3px', fontSize: '12px' }}/>
-                <input type="text" placeholder="Link YouTube" value={can.youtube_embed_url || ''} onChange={(e) => {
-                  const n = [...canciones]; n[i].youtube_embed_url = e.target.value; setCanciones(n);
-                }} style={{ width: '100%', padding: '6px', fontSize: '12px' }}/>
-              </div>
-            ))}
-            <button type="button" onClick={() => setCanciones([...canciones, { titulo: '', spotify_embed_url: '', youtube_embed_url: '' }])}>+ Añadir Canción</button>
-          </div>
-        )}
+        <div style={{ marginBottom: '1.5rem', padding: '10px', border: '1px solid #22c55e', backgroundColor: '#f0fdf4' }}>
+          <h4 style={{ color: '#16a34a' }}>Multimedia 🎵</h4>
+          {canciones.map((can, i) => (
+            <div key={i} style={{ marginBottom: '10px' }}>
+              <input type="text" placeholder="Título" value={can.titulo} onChange={(e) => {
+                const n = [...canciones]; n[i].titulo = e.target.value; setCanciones(n);
+              }} style={{ width: '100%', padding: '6px', marginBottom: '3px', boxSizing: 'border-box' }}/>
+              <input type="text" placeholder="Link Spotify" value={can.spotify_embed_url || ''} onChange={(e) => {
+                const n = [...canciones]; n[i].spotify_embed_url = e.target.value; setCanciones(n);
+              }} style={{ width: '100%', padding: '6px', marginBottom: '3px', fontSize: '12px', boxSizing: 'border-box' }}/>
+              <input type="text" placeholder="Link YouTube" value={can.youtube_embed_url || ''} onChange={(e) => {
+                const n = [...canciones]; n[i].youtube_embed_url = e.target.value; setCanciones(n);
+              }} style={{ width: '100%', padding: '6px', fontSize: '12px', boxSizing: 'border-box' }}/>
+            </div>
+          ))}
+          <button type="button" onClick={() => setCanciones([...canciones, { titulo: '', spotify_embed_url: '', youtube_embed_url: '' }])}>+ Añadir Canción</button>
+        </div>
 
         <button type="submit" disabled={cargando} style={{ width: '100%', padding: '12px', backgroundColor: '#22c55e', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>
           {cargando ? 'Guardando...' : 'Guardar Cambios Oficiales'}

@@ -1,110 +1,209 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 interface BandaPendiente {
   id: string;
   nombre: string;
   genero: string;
-  historia: string;
-  plan: string;
+  historia: string | null;
+  email: string | null;
   created_at: string;
 }
 
-export default function PanelAdmin() {
+export default function AdminPanel() {
   const [bandas, setBandas] = useState<BandaPendiente[]>([]);
   const [cargando, setCargando] = useState(true);
-
-  // Función para cargar las bandas pendientes
-  const obtenerBandasPendientes = async () => {
-    setCargando(true);
-    const { data, error } = await supabase
-      .from('bandas')
-      .select('*')
-      .eq('aprobado', false) // Solo las que no están aprobadas
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error al traer pendientes:', error.message);
-    } else {
-      setBandas(data || []);
-    }
-    setCargando(false);
-  };
+  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
+  
+  // NUEVO ESTADO: Verificación de seguridad
+  const [autenticado, setAutenticado] = useState(false);
 
   useEffect(() => {
-    obtenerBandasPendientes();
+    const verificarSesion = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        setAutenticado(false);
+        setCargando(false);
+      } else {
+        setAutenticado(true);
+        obtenerBandasPendientes();
+      }
+    };
+
+    verificarSesion();
   }, []);
 
-  // Función para aprobar la banda
-  const handleAprobar = async (id: string) => {
-    const { error } = await supabase
-      .from('bandas')
-      .update({ aprobado: true })
-      .eq('id', id);
+  const obtenerBandasPendientes = async () => {
+    setCargando(true);
+    try {
+      const { data, error } = await supabase
+        .from('bandas')
+        .select('id, nombre, genero, historia, email, created_at')
+        .eq('aprobado', false)
+        .order('created_at', { ascending: true });
 
-    if (error) {
-      alert(`Error al aprobar: ${error.message}`);
-    } else {
-      // Filtramos la banda aprobada del estado local para que desaparezca de la lista
-      setBandas(bandas.filter(b => b.id !== id));
-      alert('¡Banda aprobada con éxito! Ya es pública.');
+      if (error) throw error;
+      setBandas(data || []);
+    } catch (err: any) {
+      setMensaje({ tipo: 'error', texto: `Error al cargar: ${err.message}` });
+    } finally {
+      setCargando(false);
     }
   };
 
-  // Función para descartar/eliminar la banda (Ubicada correctamente aquí arriba)
-  const handleDescartar = async (id: string) => {
-    const confirmar = window.confirm("¿Estás seguro de que quieres descartar esta banda? Se eliminarán todos sus datos permanentemente.");
+  const handleAprobarBanda = async (id: string, nombreBanda: string) => {
+    setMensaje(null);
+    try {
+      const { error } = await supabase
+        .from('bandas')
+        .update({ aprobado: true })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setBandas(prev => prev.filter(b => b.id !== id));
+      setMensaje({ tipo: 'exito', texto: `¡La banda "${nombreBanda}" fue aprobada y ya es pública!` });
+    } catch (err: any) {
+      setMensaje({ tipo: 'error', texto: `No se pudo aprobar: ${err.message}` });
+    }
+  };
+
+  // NUEVA FUNCIÓN: Eliminar postulaciones rechazadas
+  const handleRechazarBanda = async (id: string, nombreBanda: string) => {
+    const confirmar = window.confirm(`¿Estás seguro de que querés RECHAZAR y eliminar la postulación de "${nombreBanda}"?`);
     if (!confirmar) return;
 
-    const { error } = await supabase
-      .from('bandas')
-      .delete()
-      .eq('id', id);
+    setMensaje(null);
+    try {
+      const { error } = await supabase
+        .from('bandas')
+        .delete()
+        .eq('id', id);
 
-    if (error) {
-      alert(`Error al descartar: ${error.message}`);
-    } else {
-      // La removemos del estado local para que desaparezca de la pantalla inmediatamente
-      setBandas(bandas.filter(b => b.id !== id));
-      alert('Banda descartada y eliminada correctamente.');
+      if (error) throw error;
+
+      setBandas(prev => prev.filter(b => b.id !== id));
+      setMensaje({ tipo: 'error', texto: `La postulación de "${nombreBanda}" fue rechazada.` });
+    } catch (err: any) {
+      setMensaje({ tipo: 'error', texto: `No se pudo rechazar: ${err.message}` });
     }
   };
 
-  if (cargando) return <p style={{ color: '#fff', textAlign: 'center' }}>Cargando panel de control...</p>;
+  // VISTA DE ACCESO DENEGADO SI NO INICIÓ SESIÓN
+  if (!cargando && !autenticado) {
+    return (
+      <div style={{ maxWidth: '500px', margin: '4rem auto', padding: '2rem', textAlign: 'center', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', border: '1px solid #fecaca', fontFamily: 'sans-serif' }}>
+        <h3>🔒 Acceso Restringido</h3>
+        <p>Debes iniciar sesión como administrador para gestionar las postulaciones del catálogo.</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '1rem', fontFamily: 'sans-serif', color: '#fff' }}>
-      <h2 style={{ borderBottom: '2px solid #ef4444', paddingBottom: '10px' }}>🛡️ Panel de Administración (Moderación)</h2>
-      
-      {bandas.length === 0 ? (
-        <p style={{ color: '#aaa', fontStyle: 'italic' }}>No hay bandas pendientes de aprobación por el momento. ¡Buen trabajo!</p>
+    <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '1.5rem', fontFamily: 'sans-serif', color: '#333' }}>
+      <h2 style={{ borderBottom: '2px solid #3b82f6', paddingBottom: '10px' }}>🕵️‍♂️ Panel de Administración</h2>
+      <p style={{ color: '#666' }}>Revisión de grupos musicales postulados para el Catálogo de Coronel Suárez.</p>
+
+      {/* Alertas de Feedback */}
+      {mensaje && (
+        <div style={{
+          padding: '12px',
+          marginBottom: '20px',
+          borderRadius: '6px',
+          fontWeight: 'bold',
+          backgroundColor: mensaje.tipo === 'exito' ? '#dcfce7' : '#fee2e2',
+          color: mensaje.tipo === 'exito' ? '#166534' : '#991b1b',
+          border: `1px solid ${mensaje.tipo === 'exito' ? '#bbf7d0' : '#fecaca'}`
+        }}>
+          {mensaje.texto}
+        </div>
+      )}
+
+      {cargando ? (
+        <p style={{ textAlign: 'center', fontWeight: 'bold' }}>Cargando postulaciones...</p>
+      ) : bandas.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
+          <p style={{ fontSize: '18px', margin: 0 }}>🎉 ¡No hay bandas pendientes de revisión!</p>
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           {bandas.map((banda) => (
-            <div key={banda.id} style={{ backgroundColor: '#2d2d34', padding: '1.5rem', borderRadius: '8px', borderLeft: banda.plan === 'premium' ? '5px solid #ffd700' : '5px solid #007bff' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div key={banda.id} style={{
+              padding: '1.5rem',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              backgroundColor: '#fff',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
-                  <h3 style={{ margin: '0 0 5px 0' }}>{banda.nombre} <span style={{ fontSize: '12px', padding: '2px 6px', borderRadius: '4px', backgroundColor: banda.plan === 'premium' ? '#ffd700' : '#555', color: banda.plan === 'premium' ? '#000' : '#fff' }}>{banda.plan.toUpperCase()}</span></h3>
-                  <p style={{ color: '#ef4444', margin: '0', fontWeight: 'bold', fontSize: '14px' }}>Género: {banda.genero}</p>
+                  <h3 style={{ margin: '0 0 5px 0', color: '#1e3a8a' }}>{banda.nombre}</h3>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '3px 8px',
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    marginBottom: '10px'
+                  }}>{banda.genero}</span>
                 </div>
                 
-                {/* Contenedor de botones alineados */}
+                {/* GRUPO DE BOTONES DE ACCIÓN */}
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button 
-                    onClick={() => handleAprobar(banda.id)}
-                    style={{ backgroundColor: '#22c55e', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={() => handleRechazarBanda(banda.id, banda.nombre)}
+                    style={{
+                      padding: '8px 14px',
+                      backgroundColor: '#ef4444',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#dc2626')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#ef4444')}
                   >
-                    Aprobar ✅
+                    ❌ Rechazar
                   </button>
+
                   <button 
-                    onClick={() => handleDescartar(banda.id)}
-                    style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={() => handleAprobarBanda(banda.id, banda.nombre)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#22c55e',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#16a34a')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#22c55e')}
                   >
-                    Descartar ❌
+                    ✅ Aprobar Banda
                   </button>
                 </div>
               </div>
-              <p style={{ color: '#ccc', marginTop: '10px', fontSize: '14px' }}>{banda.historia || 'Sin descripción.'}</p>
+
+              {banda.email && (
+                <p style={{ margin: '5px 0', fontSize: '14px', color: '#4b5563' }}>
+                  <strong>Contacto:</strong> {banda.email}
+                </p>
+              )}
+              
+              <p style={{ margin: '10px 0 0 0', fontSize: '14px', lineHeight: '1.5', color: '#374151', whiteSpace: 'pre-line' }}>
+                <strong>Historia:</strong> {banda.historia || 'Sin biografía cargada.'}
+              </p>
+              
+              <span style={{ display: 'block', marginTop: '12px', fontSize: '11px', color: '#9ca3af' }}>
+                Registrada el: {new Date(banda.created_at).toLocaleDateString()}
+              </span>
             </div>
           ))}
         </div>

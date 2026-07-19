@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
-import { supabase } from './lib/supabaseClient.ts';
+import { supabase } from './lib/supabaseClient'; // Corregido: Sin extensión .ts para evitar errores de compilación en Vite
 import FormularioBanda from './components/FormularioBanda';
 import PanelAdmin from './components/PanelAdmin';
 import ListaBandas from './components/ListaBandas';
-import EditarBanda from './components/EditarBanda'; // <-- 1. IMPORTAMOS EL NUEVO COMPONENTE
+import EditarBanda from './components/EditarBanda';
+import DetalleBanda from './components/DetalleBanda';
 
 function App() {
   const [conexionOk, setConexionOk] = useState<boolean | null>(null);
-  // 2. AMPLIAMOS EL ESTADO PARA INCLUIR LA PESTAÑA 'editar'
-  const [pestaña, setPestaña] = useState<'catalogo' | 'formulario' | 'admin' | 'editar'>('catalogo'); 
+  const [pestaña, setPestaña] = useState<'catalogo' | 'formulario' | 'admin' | 'editar' | 'detalle'>('catalogo'); 
+  const [bandaSeleccionadaId, setBandaSeleccionadaId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
+  // Efecto 1: Se ejecuta una sola vez al cargar la aplicación
   useEffect(() => {
     const verificarConexion = async () => {
       const { error } = await supabase.from('bandas').select('*').limit(1);
@@ -20,21 +23,40 @@ function App() {
         setConexionOk(true);
       }
     };
+
     verificarConexion();
-  }, []);
+
+    // Listener para los cambios de sesión (Login/Logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session) => {
+      const esAdminActivo = !!session?.user;
+      setIsAdmin(esAdminActivo);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []); // Arreglo vacío: evita volver a validar la conexión cada vez que cambias de pestaña
+
+  // Efecto 2: Protege la pestaña de administración si el usuario pierde la sesión de administrador
+  useEffect(() => {
+    if (!isAdmin && pestaña === 'admin') {
+      setPestaña('catalogo');
+    }
+  }, [isAdmin, pestaña]);
+
+  const verDetalleDeBanda = (id: string) => {
+    setBandaSeleccionadaId(id);
+    setPestaña('detalle');
+  };
 
   return (
     <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'sans-serif', color: '#fff', backgroundColor: '#1e1e24', minHeight: '100vh' }}>
       <h1>🎸 Catálogo de Bandas de Coronel Suárez</h1>
       
-      {/* Estado de Conexión */}
       <div style={{ marginBottom: '1.5rem', fontSize: '0.9rem' }}>
         {conexionOk === true && <span style={{ color: '#22c55e' }}>● Base de datos sincronizada</span>}
         {conexionOk === false && <span style={{ color: '#ef4444' }}>● Error de sincronización</span>}
       </div>
 
-      {/* Navegación (4 Botones) */}
-      {conexionOk === true && (
+      {conexionOk === true && pestaña !== 'detalle' && (
         <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <button 
             onClick={() => setPestaña('catalogo')}
@@ -50,7 +72,6 @@ function App() {
             Formulario de Registro
           </button>
 
-          {/* 3. NUEVO BOTÓN PARA IR A LA PESTAÑA DE EDICIÓN */}
           <button 
             onClick={() => setPestaña('editar')}
             style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: pestaña === 'editar' ? '#d97706' : '#333', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
@@ -58,21 +79,22 @@ function App() {
             Editar mi Banda ✏️
           </button>
           
-          <button 
-            onClick={() => setPestaña('admin')}
-            style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: pestaña === 'admin' ? '#ef4444' : '#333', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
-          >
-            Panel de Admin 🛡️
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => setPestaña('admin')}
+              style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: pestaña === 'admin' ? '#ef4444' : '#333', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
+            >
+              Panel de Admin 🛡️
+            </button>
+          )}
         </div>
       )}
 
-      {/* Renderizado Condicional */}
       {conexionOk === true && (
         <div>
           {pestaña === 'catalogo' && (
             <div style={{ textAlign: 'left' }}>
-              <ListaBandas />
+              <ListaBandas onSeleccionarBanda={verDetalleDeBanda} />
             </div>
           )}
 
@@ -82,14 +104,20 @@ function App() {
             </div>
           )}
 
-          {/* 4. RENDERIZAMOS EL COMPONENTE SI LA PESTAÑA SELECCIONADA ES 'editar' */}
           {pestaña === 'editar' && (
             <div style={{ textAlign: 'left' }}>
               <EditarBanda />
             </div>
           )}
           
-          {pestaña === 'admin' && (
+          {pestaña === 'detalle' && bandaSeleccionadaId && (
+            <DetalleBanda 
+              bandaId={bandaSeleccionadaId} 
+              onVolver={() => setPestaña('catalogo')} 
+            />
+          )}
+          
+          {pestaña === 'admin' && isAdmin && (
             <div style={{ textAlign: 'left' }}>
               <PanelAdmin />
             </div>

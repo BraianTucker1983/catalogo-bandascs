@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import Tilt from 'react-parallax-tilt'; // 1. Importamos la librería de efecto 3D
 import { supabase } from '../lib/supabaseClient';
 
-// Tipados para reflejar la estructura relacional de tu base de datos
 interface Integrante {
   id: string;
   nombre: string;
@@ -20,165 +20,292 @@ interface BandaCompleta {
   nombre: string;
   genero: string;
   historia: string;
-  plan: 'gratis' | 'premium';
   integrantes: Integrante[];
   canciones: Cancion[];
 }
 
-export default function ListaBandas() {
+interface ListaBandasProps {
+  onSeleccionarBanda: (id: string) => void;
+}
+
+export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
   const [bandas, setBandas] = useState<BandaCompleta[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mostrarLoginForm, setMostrarLoginForm] = useState(false);
 
   useEffect(() => {
     const traerBandasPublicas = async () => {
-      setCargando(true);
-      
-      // Traemos las bandas aprobadas junto con sus integrantes y canciones asociadas
-      const { data, error } = await supabase
-        .from('bandas')
-        .select(`
-          id, nombre, genero, historia, plan,
-          integrantes ( id, nombre, instrumento ),
-          canciones ( id, titulo, spotify_embed_url, youtube_embed_url )
-        `)
-        .eq('aprobado', true); // ¡Solo las aprobadas por el Admin!
+      try {
+        setCargando(true);
+        const { data, error } = await supabase
+          .from('bandas')
+          .select(`
+            id, 
+            nombre, 
+            genero, 
+            historia,
+            integrantes(id, nombre, instrumento),
+            canciones(id, titulo, spotify_embed_url, youtube_embed_url)
+          `)
+          .eq('aprobado', true);
 
-      if (error) {
-        console.error('Error al traer el catálogo:', error.message);
-      } else {
+        if (error) throw error;
         setBandas((data as unknown as BandaCompleta[]) || []);
+      } catch (error: any) {
+        console.error('Error al traer el catálogo:', error.message);
+      } finally {
+        setCargando(false);
       }
-      setCargando(false);
     };
 
     traerBandasPublicas();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAdmin(!!session?.user);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Función auxiliar para limpiar y renderizar iframes de YouTube de forma segura
-  const obtenerYoutubeEmbed = (url: string) => {
-    if (url.includes('embed')) return url;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? `https://www.youtube.com/embed/${match[2]}` : url;
-  };
-
-  // Función auxiliar para limpiar links de Spotify
-  const obtenerSpotifyEmbed = (url: string) => {
-    if (url.includes('embed')) return url;
-    if (url.includes('open.spotify.com')) {
-      return url.replace('open.spotify.com/', 'open.spotify.com/embed/');
+  const manejarLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      alert(`Error de ingreso: ${error.message}`);
+    } else {
+      setMostrarLoginForm(false);
+      setEmail('');
+      setPassword('');
     }
-    return url;
   };
 
-  if (cargando) return <p style={{ color: '#fff', textAlign: 'center' }}>Cargando catálogo musical...</p>;
+  const manejarLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const manejarEliminarBanda = async (e: React.MouseEvent, id: string, nombre: string) => {
+    e.stopPropagation(); 
+    const confirmar = window.confirm(`¿Estás seguro de eliminar permanentemente a "${nombre}"?`);
+    if (!confirmar) return;
+
+    setEliminandoId(id);
+    try {
+      const { error } = await supabase.from('bandas').delete().eq('id', id);
+      if (error) throw error;
+      setBandas((prevBandas) => prevBandas.filter((b) => b.id !== id));
+      alert('Eliminada con éxito.');
+    } catch (error: any) {
+      console.error(error.message);
+    } finally {
+      setEliminandoId(null);
+    }
+  };
+
+  if (cargando) return <p style={{ color: '#d4af37', textAlign: 'center', fontFamily: 'Georgia, serif', marginTop: '3rem' }}>Desenrollando pergamino musical...</p>;
 
   return (
-    <div style={{ maxWidth: '900px', margin: '2rem auto', padding: '1rem', fontFamily: 'sans-serif', color: '#fff' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '2rem', borderBottom: '2px solid #22c55e', paddingBottom: '10px' }}>
-        🎵 Bandas Oficiales de Coronel Suárez
+    <div style={{ 
+      maxWidth: '1100px', 
+      margin: '2rem auto', 
+      padding: '2rem 1rem', 
+      fontFamily: 'Georgia, serif', 
+      color: '#f4ecd8', 
+      position: 'relative' 
+    }}>
+      
+      {/* PANEL ADMIN VINTAGE */}
+      <div style={{ position: 'absolute', top: '-10px', right: '1rem', zIndex: 10 }}>
+        {!isAdmin ? (
+          <div>
+            <button 
+              onClick={() => setMostrarLoginForm(!mostrarLoginForm)}
+              style={{ backgroundColor: '#3e2723', color: '#d4af37', border: '1px solid #d4af37', padding: '5px 10px', borderRadius: '2px', cursor: 'pointer', fontSize: '12px' }}
+            >
+              {mostrarLoginForm ? 'Cerrar' : '🔒 Acceso Archivero'}
+            </button>
+
+            {mostrarLoginForm && (
+              <form onSubmit={manejarLogin} style={{ backgroundColor: '#2b1d16', padding: '15px', borderRadius: '4px', marginTop: '5px', border: '1px solid #d4af37', display: 'flex', flexDirection: 'column', gap: '8px', width: '200px' }}>
+                <input 
+                  type="email" 
+                  placeholder="Email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)}
+                  required 
+                  style={{ padding: '6px', backgroundColor: '#3e2723', color: '#f4ecd8', border: '1px solid #5d4037' }}
+                />
+                <input 
+                  type="password" 
+                  placeholder="Contraseña" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)}
+                  required 
+                  style={{ padding: '6px', backgroundColor: '#3e2723', color: '#f4ecd8', border: '1px solid #5d4037' }}
+                />
+                <button type="submit" style={{ backgroundColor: '#d4af37', color: '#1a0f0a', border: 'none', padding: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  Entrar
+                </button>
+              </form>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#2b1d16', padding: '5px 10px', border: '1px solid #d4af37' }}>
+            <span style={{ fontSize: '12px', color: '#d4af37' }}>● Modo Conservador</span>
+            <button onClick={manejarLogout} style={{ backgroundColor: '#b71c1c', color: '#fff', border: 'none', padding: '3px 7px', cursor: 'pointer', fontSize: '11px' }}>Salir</button>
+          </div>
+        )}
+      </div>
+
+      <h2 style={{ 
+        textAlign: 'center', 
+        marginBottom: '3rem', 
+        color: '#d4af37', 
+        fontSize: '2.2rem',
+        letterSpacing: '1px',
+        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+        borderBottom: '1px double #d4af37',
+        paddingBottom: '15px'
+      }}>
+        📜 Registro General de Bandas & Orquestas
       </h2>
 
       {bandas.length === 0 ? (
-        <p style={{ color: '#aaa', textAlign: 'center', fontStyle: 'italic' }}>
-          Aún no hay bandas aprobadas en la cartelera principal. ¡Ve al panel de admin y aprueba una!
+        <p style={{ color: '#8d6e63', textAlign: 'center', fontStyle: 'italic' }}>
+          No se registran agrupaciones en este archivo dorado.
         </p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '25px' }}>
-          {bandas.map((banda) => {
-            const esPremium = banda.plan === 'premium';
-
-            return (
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', 
+          gap: '35px' 
+        }}>
+          {bandas.map((banda) => (
+            /* 2. Envolvemos la Card con el componente de la librería */
+            <Tilt
+              key={banda.id}
+              tiltMaxAngleX={12} // Inclinación vertical máxima
+              tiltMaxAngleY={12} // Inclinación horizontal máxima
+              perspective={900}  // Factor de profundidad 3D
+              scale={1.03}       // Sutil acercamiento del cuadro
+              transitionSpeed={1200} // Transición suave al mover el cursor
+              glareEnable={true} // Agrega un reflejo luminoso sutil sobre el lienzo
+              glareMaxOpacity={0.15}
+              glareColor="#ffffff"
+              style={{ display: 'flex', height: '100%' }}
+            >
               <div 
-                key={banda.id} 
+                onClick={() => onSeleccionarBanda(banda.id)}
                 style={{ 
-                  backgroundColor: '#2d2d34', 
-                  borderRadius: '12px', 
-                  padding: '2rem',
-                  boxShadow: esPremium ? '0 0 15px rgba(255, 215, 0, 0.2)' : '0 4px 6px rgba(0,0,0,0.1)',
-                  border: esPremium ? '2px solid #ffd700' : '1px solid #444',
-                  position: 'relative'
+                  // MOLDURA DE MADERA COMPUESTA (Doble borde concéntrico simulando marcos antiguos)
+                  backgroundColor: '#1c120c', // Paspartú interno oscuro
+                  border: '14px solid #3a1f13', // Moldura de madera principal
+                  outline: '3px solid #1a0a03',  // Contorno exterior oscuro
+                  outlineOffset: '-17px',        // Ranura de sombra interna entre madera y lienzo
+                  borderRadius: '3px',
+                  
+                  // Sombras múltiples: Proyección realista en pared + oscuridad interna del marco
+                  boxShadow: `
+                    0 15px 30px rgba(0,0,0,0.7), 
+                    inset 0 3px 6px rgba(255,255,255,0.05), 
+                    inset 0 0 25px rgba(0,0,0,0.95)
+                  `,
+                  
+                  padding: '1.5rem 1.2rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'between',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}
               >
-                {/* Insignia Premium */}
-                {esPremium && (
-                  <span style={{ position: 'absolute', top: '15px', right: '15px', backgroundColor: '#ffd700', color: '#000', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
-                    👑 PREMIUM
-                  </span>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => manejarEliminarBanda(e, banda.id, banda.nombre)}
+                    disabled={eliminandoId === banda.id}
+                    style={{
+                      position: 'absolute', top: '0.5rem', right: '0.5rem',
+                      backgroundColor: '#b71c1c', color: '#fff', border: 'none',
+                      padding: '2px 6px', cursor: 'pointer', fontSize: '10px', zIndex: 15
+                    }}
+                  >
+                    ✕
+                  </button>
                 )}
 
-                {/* Info Principal */}
-                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.8rem', color: esPremium ? '#ffd700' : '#fff' }}>{banda.nombre}</h3>
-                <span style={{ backgroundColor: '#444', padding: '3px 8px', borderRadius: '4px', fontSize: '12px', color: '#22c55e', fontWeight: 'bold' }}>
-                  {banda.genero}
-                </span>
+                {/* Contenido */}
+                <div style={{ flexGrow: 1, textAlign: 'center' }}>
+                  <h3 style={{ 
+                    margin: '0 0 10px 0', 
+                    fontSize: '1.5rem', 
+                    color: '#f4ecd8',
+                    fontFamily: '"Times New Roman", Times, serif',
+                    borderBottom: '1px dashed #5d4037',
+                    paddingBottom: '10px'
+                  }}>
+                    {banda.nombre}
+                  </h3>
+                  
+                  <span style={{ 
+                    fontStyle: 'italic', 
+                    fontSize: '0.85rem', 
+                    color: '#d4af37', 
+                    letterSpacing: '1px',
+                    textTransform: 'uppercase'
+                  }}>
+                    — {banda.genero} —
+                  </span>
 
-                <p style={{ color: '#ccc', marginTop: '15px', lineHeight: '1.5' }}>
-                  {banda.historia || 'Sin descripción disponible.'}
-                </p>
-
-                {/* Sección Integrantes */}
-                <div style={{ marginTop: '1.5rem', borderTop: '1px solid #444', paddingTop: '10px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#aaa' }}>Integrantes:</h4>
-                  {esPremium ? (
-                    // Vista Premium: Muestra nombres e instrumentos con estilo de etiquetas
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {banda.integrantes.map(i => (
-                        <span key={i.id} style={{ backgroundColor: '#1e1e24', padding: '5px 10px', borderRadius: '6px', fontSize: '14px', border: '1px solid #555' }}>
-                          👤 <strong>{i.nombre}</strong> {i.instrumento ? `(${i.instrumento})` : ''}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    // Vista Gratis: Lista simple de nombres separados por comas
-                    <p style={{ color: '#eee', fontSize: '15px', margin: '0' }}>
-                      {banda.integrantes.map(i => i.nombre).join(', ')}
-                    </p>
-                  )}
+                  <p style={{ 
+                    color: '#bcaaa4', 
+                    marginTop: '15px', 
+                    lineHeight: '1.5', 
+                    fontSize: '0.88rem',
+                    fontFamily: 'Georgia, serif',
+                    textAlign: 'justify',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 4, 
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {banda.historia || 'Sin registros cronológicos en el archivo.'}
+                  </p>
                 </div>
 
-                {/* Sección Multimedia (EXCLUSIVA PREMIUM) */}
-                {esPremium && banda.canciones && banda.canciones.length > 0 && (
-                  <div style={{ marginTop: '2rem', borderTop: '1px dashed #ffd700', paddingTop: '15px' }}>
-                    <h4 style={{ margin: '0 0 15px 0', color: '#ffd700' }}>Escuchá su música 🎧</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
-                      {banda.canciones.map((cancion) => (
-                        <div key={cancion.id} style={{ backgroundColor: '#1e1e24', padding: '10px', borderRadius: '8px' }}>
-                          <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#fff' }}>🎵 {cancion.titulo}</p>
-                          
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {cancion.spotify_embed_url && (
-                              <iframe 
-                                src={obtenerSpotifyEmbed(cancion.spotify_embed_url)} 
-                                width="100%" 
-                                height="80" 
-                                frameBorder="0" 
-                                allow="encrypted-media"
-                                style={{ borderRadius: '8px' }}
-                              ></iframe>
-                            )}
-
-                            {cancion.youtube_embed_url && (
-                              <iframe 
-                                width="100%" 
-                                height="200" 
-                                src={obtenerYoutubeEmbed(cancion.youtube_embed_url)} 
-                                title={cancion.titulo}
-                                frameBorder="0" 
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                allowFullScreen
-                                style={{ borderRadius: '8px' }}
-                              ></iframe>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                {/* Base del cuadro: Chapita de bronce identificatoria */}
+                <div style={{ 
+                  marginTop: '1.5rem', 
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  borderTop: '1px solid #3a1f13', 
+                  paddingTop: '14px' 
+                }}>
+                  <div style={{
+                    backgroundColor: '#2b1d16',
+                    border: '1px solid #d4af37',
+                    color: '#d4af37',
+                    padding: '5px 14px',
+                    fontSize: '0.72rem',
+                    letterSpacing: '1.5px',
+                    borderRadius: '1px',
+                    boxShadow: 'inset 0 0 5px rgba(0,0,0,0.6)',
+                    fontWeight: 'bold'
+                  }}>
+                    LEER LEGAJO 📜
                   </div>
-                )}
+                </div>
+
               </div>
-            );
-          })}
+            </Tilt>
+          ))}
         </div>
       )}
     </div>
