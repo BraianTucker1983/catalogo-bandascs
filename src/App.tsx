@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from './lib/supabaseClient'; // Corregido: Sin extensión .ts para evitar errores de compilación en Vite
+import { supabase } from './lib/supabaseClient'; 
 import FormularioBanda from './components/FormularioBanda';
 import PanelAdmin from './components/PanelAdmin';
 import ListaBandas from './components/ListaBandas';
@@ -12,7 +12,7 @@ function App() {
   const [bandaSeleccionadaId, setBandaSeleccionadaId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Efecto 1: Se ejecuta una sola vez al cargar la aplicación
+  // Efecto 1: Verificar conexión a Supabase y escuchar auth
   useEffect(() => {
     const verificarConexion = async () => {
       const { error } = await supabase.from('bandas').select('*').limit(1);
@@ -26,16 +26,15 @@ function App() {
 
     verificarConexion();
 
-    // Listener para los cambios de sesión (Login/Logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session) => {
       const esAdminActivo = !!session?.user;
       setIsAdmin(esAdminActivo);
     });
 
     return () => subscription.unsubscribe();
-  }, []); // Arreglo vacío: evita volver a validar la conexión cada vez que cambias de pestaña
+  }, []); 
 
-  // Efecto 2: Protege la pestaña de administración si el usuario pierde la sesión de administrador
+  // Efecto 2: Proteger pestaña admin
   useEffect(() => {
     if (!isAdmin && pestaña === 'admin') {
       setPestaña('catalogo');
@@ -48,82 +47,121 @@ function App() {
   };
 
   return (
-    <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'sans-serif', color: '#fff', backgroundColor: '#1e1e24', minHeight: '100vh' }}>
-      <h1>🎸 Catálogo de Bandas de Coronel Suárez</h1>
+    <div className="relative min-h-screen w-full bg-background text-foreground overflow-x-hidden antialiased py-12 px-4">
       
-      <div style={{ marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-        {conexionOk === true && <span style={{ color: '#22c55e' }}>● Base de datos sincronizada</span>}
-        {conexionOk === false && <span style={{ color: '#ef4444' }}>● Error de sincronización</span>}
-      </div>
+      {/* Efectos de Luces Ambientales (Glows de CLIMA) */}
+      <div
+        className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] rounded-full opacity-15 blur-[130px] pointer-events-none z-0"
+        style={{ background: "radial-gradient(circle, var(--glow-blue) 0%, transparent 75%)" }}
+      />
+      <div
+        className="absolute bottom-10 right-[-5%] w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] pointer-events-none z-0"
+        style={{ background: "radial-gradient(circle, var(--glow-violet) 0%, transparent 75%)" }}
+      />
 
-      {conexionOk === true && pestaña !== 'detalle' && (
-        <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <button 
-            onClick={() => setPestaña('catalogo')}
-            style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: pestaña === 'catalogo' ? '#22c55e' : '#333', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
-          >
-            Ver Catálogo Público 🎵
-          </button>
-          
-          <button 
-            onClick={() => setPestaña('formulario')}
-            style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: pestaña === 'formulario' ? '#007bff' : '#333', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
-          >
-            Formulario de Registro
-          </button>
+      {/* Contenedor Principal */}
+      <div className="relative z-10 max-w-6xl mx-auto text-center">
+        
+        {/* Título Principal */}
+        <h1 className="text-3xl md:text-5xl font-black tracking-tight uppercase mb-2 text-white">
+          🎸 Catálogo de Bandas de <span className="gradient-text">Coronel Suárez</span>
+        </h1>
+        
+        {/* Estado de Sincronización de Base de Datos */}
+        <div className="mb-8 text-sm font-semibold tracking-wide">
+          {conexionOk === true && (
+            <span className="text-emerald-400 flex items-center justify-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Base de datos sincronizada
+            </span>
+          )}
+          {conexionOk === false && (
+            <span className="text-destructive flex items-center justify-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-destructive" />
+              Error de sincronización con el servidor
+            </span>
+          )}
+        </div>
 
-          <button 
-            onClick={() => setPestaña('editar')}
-            style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: pestaña === 'editar' ? '#d97706' : '#333', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
-          >
-            Editar mi Banda ✏️
-          </button>
-          
-          {isAdmin && (
+        {/* Menú de Navegación de Pestañas (Solo si hay conexión y no estás en detalle) */}
+        {conexionOk === true && pestaña !== 'detalle' && (
+          <div className="mb-12 flex justify-center items-center gap-3 flex-wrap p-2 bg-card/40 border border-border rounded-xl backdrop-blur-md max-w-2xl mx-auto">
             <button 
-              onClick={() => setPestaña('admin')}
-              style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: pestaña === 'admin' ? '#ef4444' : '#333', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
+              onClick={() => setPestaña('catalogo')}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                pestaña === 'catalogo' 
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
             >
-              Panel de Admin 🛡️
+              Catálogo Público 🎵
             </button>
-          )}
-        </div>
-      )}
+            
+            <button 
+              onClick={() => setPestaña('formulario')}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                pestaña === 'formulario' 
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
+            >
+              Registrar Banda
+            </button>
 
-      {conexionOk === true && (
-        <div>
-          {pestaña === 'catalogo' && (
-            <div style={{ textAlign: 'left' }}>
+            <button 
+              onClick={() => setPestaña('editar')}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                pestaña === 'editar' 
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
+            >
+              Editar mi Banda ✏️
+            </button>
+            
+            {isAdmin && (
+              <button 
+                onClick={() => setPestaña('admin')}
+                className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  pestaña === 'admin' 
+                    ? 'bg-destructive text-white' 
+                    : 'text-destructive/80 hover:text-destructive hover:bg-destructive/10'
+                }`}
+              >
+                Panel Admin 🛡️
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Vistas Dinámicas */}
+        {conexionOk === true && (
+          <div className="w-full text-left transition-all duration-300">
+            {pestaña === 'catalogo' && (
               <ListaBandas onSeleccionarBanda={verDetalleDeBanda} />
-            </div>
-          )}
+            )}
 
-          {pestaña === 'formulario' && (
-            <div style={{ backgroundColor: '#fff', color: '#000', padding: '1rem', borderRadius: '8px', textAlign: 'left' }}>
+            {pestaña === 'formulario' && (
               <FormularioBanda />
-            </div>
-          )}
+            )}
 
-          {pestaña === 'editar' && (
-            <div style={{ textAlign: 'left' }}>
+            {pestaña === 'editar' && (
               <EditarBanda />
-            </div>
-          )}
-          
-          {pestaña === 'detalle' && bandaSeleccionadaId && (
-            <DetalleBanda 
-              bandaId={bandaSeleccionadaId} 
-              onVolver={() => setPestaña('catalogo')} 
-            />
-          )}
-          
-          {pestaña === 'admin' && isAdmin && (
-            <div style={{ textAlign: 'left' }}>
+            )}
+            
+            {pestaña === 'detalle' && bandaSeleccionadaId && (
+              <DetalleBanda 
+                bandaId={bandaSeleccionadaId} 
+                onVolver={() => setPestaña('catalogo')} 
+              />
+            )}
+            
+            {pestaña === 'admin' && isAdmin && (
               <PanelAdmin />
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-// Lista de géneros musicales típicos de la región para los checkboxes
 const GENEROS_DISPONIBLES = [
   'Rock',
   'Pop',
@@ -16,24 +15,21 @@ const GENEROS_DISPONIBLES = [
 
 export default function FormularioBanda() {
   const [nombre, setNombre] = useState('');
+  const [email, setEmail] = useState('');
+  const [palabraClave, setPalabraClave] = useState(''); // <-- NUEVO: Estado para la palabra clave
   const [historia, setHistoria] = useState('');
-  
-  // 1. Manejo de géneros mediante un Array de strings seleccionados
   const [generosSeleccionados, setGenerosSeleccionados] = useState<string[]>([]);
   
-  // Estados para integrantes dinámicos
   const [integrantes, setIntegrantes] = useState<{ nombre: string; instrumento: string }[]>([
     { nombre: '', instrumento: '' }
   ]);
 
-  // Estados para canciones dinámicas
   const [canciones, setCanciones] = useState<{ titulo: string; spotify: string; youtube: string }[]>([
     { titulo: '', spotify: '', youtube: '' }
   ]);
 
   const [enviando, setEnviando] = useState(false);
 
-  // Manejar la selección/deselección de los checkboxes de género
   const manejarCambioGenero = (genero: string) => {
     if (generosSeleccionados.includes(genero)) {
       setGenerosSeleccionados(generosSeleccionados.filter(g => g !== genero));
@@ -42,7 +38,6 @@ export default function FormularioBanda() {
     }
   };
 
-  // Manejadores para Integrantes
   const cambiarIntegrante = (index: number, campo: 'nombre' | 'instrumento', valor: string) => {
     const nuevos = [...integrantes];
     nuevos[index][campo] = valor;
@@ -59,7 +54,6 @@ export default function FormularioBanda() {
     }
   };
 
-  // Manejadores para Canciones
   const cambiarCancion = (index: number, campo: 'titulo' | 'spotify' | 'youtube', valor: string) => {
     const nuevas = [...canciones];
     nuevas[index][campo] = valor;
@@ -76,7 +70,6 @@ export default function FormularioBanda() {
     }
   };
 
-  // Enviar el formulario completo a Supabase
   const manejarEnvio = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -88,18 +81,19 @@ export default function FormularioBanda() {
     setEnviando(true);
 
     try {
-      // Convertimos el array de géneros seleccionados en un solo string (Ej: "Rock, Punk, Alternativo")
       const generoFinalString = generosSeleccionados.join(', ');
 
-      // 1. Insertar la Banda en la tabla 'bandas'
+      // Enviamos el email y la palabra clave elegida a Supabase
       const { data: bandaInsertada, error: errorBanda } = await supabase
         .from('bandas')
         .insert([
           {
             nombre,
+            email,
+            palabra_clave: palabraClave, // <-- NUEVO: Se guarda en la columna correspondiente
             genero: generoFinalString,
             historia,
-            aprobado: false // Queda en revisión para el administrador
+            aprobado: false
           }
         ])
         .select()
@@ -109,7 +103,6 @@ export default function FormularioBanda() {
 
       const bandaId = bandaInsertada.id;
 
-      // 2. Insertar los Integrantes filtrando los que estén vacíos
       const integrantesFiltrados = integrantes
         .filter(i => i.nombre.trim() !== '')
         .map(i => ({
@@ -122,11 +115,9 @@ export default function FormularioBanda() {
         const { error: errorIntegrantes } = await supabase
           .from('integrantes')
           .insert(integrantesFiltrados);
-        
         if (errorIntegrantes) throw errorIntegrantes;
       }
 
-      // 3. Insertar las Canciones filtrando los títulos vacíos
       const cancionesFiltradas = canciones
         .filter(c => c.titulo.trim() !== '')
         .map(c => ({
@@ -140,105 +131,110 @@ export default function FormularioBanda() {
         const { error: errorCanciones } = await supabase
           .from('canciones')
           .insert(cancionesFiltradas);
-        
         if (errorCanciones) throw errorCanciones;
       }
 
-      alert('¡Inscripción completada con éxito! La banda quedó registrada en la base de datos y será visible en el catálogo una vez que el administrador la apruebe.');
+      alert('¡Inscripción completada! Tu banda se envió para revisión del administrador.');
       
-      // Resetear formulario completo
+      // Reseteo de estados
       setNombre('');
+      setEmail('');
+      setPalabraClave(''); // <-- Limpieza del estado
       setGenerosSeleccionados([]);
       setHistoria('');
       setIntegrantes([{ nombre: '', instrumento: '' }]);
       setCanciones([{ titulo: '', spotify: '', youtube: '' }]);
 
     } catch (error: any) {
-      console.error('Error al guardar en Supabase:', error.message);
-      alert(`Hubo un problema al procesar la solicitud: ${error.message}`);
+      console.error(error.message);
+      alert(`Hubo un error al guardar: ${error.message}`);
     } finally {
       setEnviando(false);
     }
   };
 
-  // Objetos de estilos comunes para mantener la estética Vintage/Madera
-  const estiloLabel = { display: 'block', margin: '15px 0 5px 0', color: '#d4af37', fontWeight: 'bold', fontSize: '1.1rem' };
-  const estiloInputText = { width: '100%', padding: '10px', boxSizing: 'border-box' as const, backgroundColor: '#3e2723', color: '#f4ecd8', border: '1px solid #d4af37', borderRadius: '2px', fontFamily: 'Georgia, serif', fontSize: '1rem' };
+  const inputClass = "w-full p-3 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors text-sm";
+  const labelClass = "block text-sm font-semibold tracking-wider uppercase text-white/80 mb-2";
 
   return (
-    <div style={{
-      maxWidth: '750px',
-      margin: '2rem auto',
-      backgroundColor: '#1c120c',
-      border: '12px solid #3a1f13',
-      outline: '3px solid #1a0a03',
-      outlineOffset: '-15px',
-      boxShadow: '0 15px 35px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.95)',
-      padding: '2.5rem',
-      fontFamily: 'Georgia, serif',
-      color: '#f4ecd8',
-      borderRadius: '4px'
-    }}>
-      <h2 style={{ textAlign: 'center', color: '#d4af37', fontSize: '2rem', borderBottom: '1px double #5d4037', paddingBottom: '15px', marginTop: 0 }}>
-        📜 Formulario de Inscripción Musical
-      </h2>
-      <p style={{ textAlign: 'center', color: '#bcaaa4', fontStyle: 'italic', fontSize: '0.95rem', marginBottom: '2rem' }}>
-        Registre los datos de su agrupación para ser incorporada al archivo histórico oficial de Coronel Suárez.
-      </p>
+    <div className="max-w-3xl mx-auto my-12 bg-card border border-border p-8 rounded-2xl shadow-2xl relative text-foreground">
+      
+      <div className="text-center mb-10">
+        <h2 className="text-2xl md:text-3xl font-black tracking-wide uppercase mb-2 text-white">
+          Formulario de <span className="gradient-text">Inscripción</span>
+        </h2>
+        <p className="text-sm text-muted-foreground font-medium">
+          Registrá los datos de tu proyecto musical en nuestro catálogo digital.
+        </p>
+      </div>
 
-      <form onSubmit={manejarEnvio}>
-        {/* Nombre de la Banda */}
+      <form onSubmit={manejarEnvio} className="space-y-6">
+        
+        {/* Nombre */}
         <div>
-          <label style={estiloLabel}>Nombre de la Agrupación:</label>
+          <label className={labelClass}>Nombre de la Agrupación</label>
           <input 
             type="text" 
             value={nombre} 
             onChange={(e) => setNombre(e.target.value)} 
             required 
-            placeholder="Ej: Los Suarenses del Rock"
-            style={estiloInputText}
+            placeholder="Ej: CLIMA"
+            className={inputClass}
           />
         </div>
 
-        {/* SECCIÓN NUEVA: Checkboxes de Géneros Musicales Estilizados */}
+        {/* Sección de Credenciales de Contacto y Seguridad */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Email */}
+          <div>
+            <label className={labelClass}>Correo Electrónico</label>
+            <input 
+              type="email" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              required 
+              placeholder="nombre@ejemplo.com"
+              className={inputClass}
+            />
+          </div>
+
+          {/* NUEVO: Campo Palabra Clave */}
+          <div>
+            <label className={labelClass}>Palabra Clave de Edición</label>
+            <input 
+              type="text" // Podés cambiarlo a "password" si preferís que no se vea al tipear
+              value={palabraClave} 
+              onChange={(e) => setPalabraClave(e.target.value)} 
+              required 
+              placeholder="Ej: miclavesecreta123"
+              className={inputClass}
+            />
+          </div>
+        </div>
+        <span className="text-xs text-muted-foreground -mt-2 block">
+          Guardá bien esta palabra clave. La necesitarás junto a tu correo si deseás modificar o actualizar los datos de la banda más adelante.
+        </span>
+
+        {/* Checkboxes de Géneros */}
         <div>
-          <label style={estiloLabel}>Géneros Musicales (Podés marcar varios):</label>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
-            gap: '10px', 
-            backgroundColor: '#2b1d16', 
-            padding: '15px', 
-            borderRadius: '2px', 
-            border: '1px dashed #5d4037',
-            marginTop: '5px'
-          }}>
+          <label className={labelClass}>Géneros Musicales</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-background/50 border border-border rounded-xl">
             {GENEROS_DISPONIBLES.map((genero) => {
-              const estaSeleccionado = generosSeleccionados.includes(genero);
+              const activo = generosSeleccionados.includes(genero);
               return (
                 <label 
                   key={genero} 
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '10px', 
-                    cursor: 'pointer',
-                    color: estaSeleccionado ? '#d4af37' : '#bcaaa4',
-                    fontWeight: estaSeleccionado ? 'bold' : 'normal',
-                    fontSize: '0.95rem',
-                    transition: 'color 0.2s'
-                  }}
+                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border select-none transition-all text-xs font-semibold ${
+                    activo 
+                    ? 'border-primary/50 bg-primary/5 text-white' 
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
                 >
                   <input 
                     type="checkbox" 
-                    checked={estaSeleccionado}
+                    checked={activo}
                     onChange={() => manejarCambioGenero(genero)}
-                    style={{ 
-                      accentColor: '#d4af37', // Color vintage para el checkbox nativo
-                      width: '16px',
-                      height: '16px',
-                      cursor: 'pointer'
-                    }}
+                    className="w-4 h-4 rounded text-primary focus:ring-0 cursor-pointer accent-primary"
                   />
                   {genero}
                 </label>
@@ -247,130 +243,120 @@ export default function FormularioBanda() {
           </div>
         </div>
 
-        {/* Reseña Histórica */}
+        {/* Biografía */}
         <div>
-          <label style={estiloLabel}>Reseña Histórica / Biografía:</label>
+          <label className={labelClass}>Reseña Histórica / Biografía</label>
           <textarea 
             value={historia} 
             onChange={(e) => setHistoria(e.target.value)} 
-            rows={5}
-            placeholder="Contanos cuándo se formó la banda, hitos importantes, discos grabados y trayectoria en la comunidad..."
-            style={{ ...estiloInputText, resize: 'vertical' }}
+            rows={4}
+            placeholder="Contanos la historia de la banda, lanzamientos, trayectoria..."
+            className={`${inputClass} resize-none`}
           />
         </div>
 
-        {/* SECCIÓN: Integrantes de la Orquesta */}
-        <div style={{ marginTop: '2rem', borderTop: '1px solid #5d4037', paddingTop: '1.5rem' }}>
-          <h3 style={{ margin: '0 0 15px 0', color: '#d4af37', fontSize: '1.3rem' }}>👥 Nómina de Músicos / Integrantes</h3>
-          
-          {integrantes.map((integrante, index) => (
-            <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
-              <input 
-                type="text" 
-                placeholder="Nombre completo" 
-                value={integrante.nombre} 
-                onChange={(e) => cambiarIntegrante(index, 'nombre', e.target.value)}
-                style={estiloInputText}
-              />
-              <input 
-                type="text" 
-                placeholder="Instrumento (Ej: Guitarra)" 
-                value={integrante.instrumento} 
-                onChange={(e) => cambiarIntegrante(index, 'instrumento', e.target.value)}
-                style={estiloInputText}
-              />
-              {integrantes.length > 1 && (
-                <button 
-                  type="button" 
-                  onClick={() => eliminarIntegrante(index)} 
-                  style={{ backgroundColor: '#b71c1c', color: '#fff', border: 'none', padding: '10px 12px', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
-          <button 
-            type="button" 
-            onClick={agregarIntegrante} 
-            style={{ backgroundColor: '#5d4037', color: '#f4ecd8', border: '1px solid #d4af37', padding: '6px 12px', cursor: 'pointer', fontSize: '0.9rem', marginTop: '5px' }}
-          >
-            + Añadir Músico
-          </button>
-        </div>
-
-        {/* SECCIÓN: Obras / Archivos Multimedia */}
-        <div style={{ marginTop: '2rem', borderTop: '1px solid #5d4037', paddingTop: '1.5rem' }}>
-          <h3 style={{ margin: '0 0 15px 0', color: '#d4af37', fontSize: '1.3rem' }}>🎧 Enlaces de Obras & Canciones</h3>
-          
-          {canciones.map((cancion, index) => (
-            <div key={index} style={{ backgroundColor: '#2b1d16', padding: '15px', borderRadius: '2px', border: '1px dashed #5d4037', marginBottom: '15px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontWeight: 'bold', color: '#d4af37', fontSize: '0.9rem' }}>Canción N° {index + 1}</span>
-                {canciones.length > 1 && (
+        {/* Sección Integrantes */}
+        <div className="pt-6 border-t border-border">
+          <h3 className="text-base font-bold uppercase tracking-wider text-white mb-4">👥 Integrantes</h3>
+          <div className="space-y-3">
+            {integrantes.map((integrante, index) => (
+              <div key={index} className="flex gap-3 items-center">
+                <input 
+                  type="text" 
+                  placeholder="Nombre" 
+                  value={integrante.nombre} 
+                  onChange={(e) => cambiarIntegrante(index, 'nombre', e.target.value)}
+                  className={inputClass}
+                />
+                <input 
+                  type="text" 
+                  placeholder="Instrumento" 
+                  value={integrante.instrumento} 
+                  onChange={(e) => cambiarIntegrante(index, 'instrumento', e.target.value)}
+                  className={inputClass}
+                />
+                {integrantes.length > 1 && (
                   <button 
                     type="button" 
-                    onClick={() => eliminarCancion(index)} 
-                    style={{ backgroundColor: '#b71c1c', color: '#fff', border: 'none', padding: '3px 8px', cursor: 'pointer', fontSize: '0.8rem' }}
+                    onClick={() => eliminarIntegrante(index)} 
+                    className="p-3 bg-destructive/10 hover:bg-destructive text-destructive hover:text-white rounded-lg transition-colors cursor-pointer text-sm"
                   >
-                    Quitar Canción
+                    ✕
                   </button>
                 )}
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Título del tema" 
-                  value={cancion.titulo} 
-                  onChange={(e) => cambiarCancion(index, 'titulo', e.target.value)}
-                  style={estiloInputText}
-                />
-                <input 
-                  type="url" 
-                  placeholder="URL de Spotify (Opcional)" 
-                  value={cancion.spotify} 
-                  onChange={(e) => cambiarCancion(index, 'spotify', e.target.value)}
-                  style={estiloInputText}
-                />
-                <input 
-                  type="url" 
-                  placeholder="URL de YouTube (Opcional)" 
-                  value={cancion.youtube} 
-                  onChange={(e) => cambiarCancion(index, 'youtube', e.target.value)}
-                  style={estiloInputText}
-                />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
           <button 
             type="button" 
-            onClick={agregarCancion} 
-            style={{ backgroundColor: '#5d4037', color: '#f4ecd8', border: '1px solid #d4af37', padding: '6px 12px', cursor: 'pointer', fontSize: '0.9rem' }}
+            onClick={agregarIntegrante} 
+            className="mt-3 text-xs font-bold text-primary hover:text-white transition-colors cursor-pointer"
           >
-            + Registrar Otra Canción
+            + Añadir integrante
           </button>
         </div>
 
-        {/* Botón de Envío */}
-        <div style={{ marginTop: '3rem', textAlign: 'center' }}>
+        {/* Sección Canciones */}
+        <div className="pt-6 border-t border-border">
+          <h3 className="text-base font-bold uppercase tracking-wider text-white mb-4">🎧 Canciones / Enlaces</h3>
+          <div className="space-y-4">
+            {canciones.map((cancion, index) => (
+              <div key={index} className="p-4 bg-background/40 border border-border rounded-xl space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pista #{index + 1}</span>
+                  {canciones.length > 1 && (
+                    <button 
+                      type="button" 
+                      onClick={() => eliminarCancion(index)} 
+                      className="text-xs font-bold text-destructive hover:underline cursor-pointer"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <input 
+                    type="text" 
+                    placeholder="Título del tema" 
+                    value={cancion.titulo} 
+                    onChange={(e) => cambiarCancion(index, 'titulo', e.target.value)}
+                    className={inputClass}
+                  />
+                  <input 
+                    type="url" 
+                    placeholder="Link embebido de Spotify" 
+                    value={cancion.spotify} 
+                    onChange={(e) => cambiarCancion(index, 'spotify', e.target.value)}
+                    className={inputClass}
+                  />
+                  <input 
+                    type="url" 
+                    placeholder="Link embebido de YouTube" 
+                    value={cancion.youtube} 
+                    onChange={(e) => cambiarCancion(index, 'youtube', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <button 
+            type="button" 
+            onClick={agregarCancion} 
+            className="mt-3 text-xs font-bold text-primary hover:text-white transition-colors cursor-pointer"
+          >
+            + Agregar otra pista
+          </button>
+        </div>
+
+        {/* Botón de envío */}
+        <div className="pt-6 text-center">
           <button 
             type="submit" 
             disabled={enviando}
-            style={{ 
-              backgroundColor: '#d4af37', 
-              color: '#1a0f0a', 
-              border: '1px solid #1a0a03', 
-              padding: '12px 35px', 
-              fontSize: '1.2rem', 
-              fontWeight: 'bold', 
-              cursor: enviando ? 'not-allowed' : 'pointer', 
-              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-              opacity: enviando ? 0.6 : 1,
-              letterSpacing: '1px'
-            }}
+            className="glow-button w-full sm:w-auto uppercase tracking-widest disabled:opacity-50"
           >
-            {enviando ? 'Guardando Registro...' : '🏛️ Asentar en el Registro Oficial'}
+            {enviando ? 'Procesando...' : 'Asentarse en el catálogo'}
           </button>
         </div>
       </form>
