@@ -13,12 +13,25 @@ const GENEROS_DISPONIBLES = [
   'Alternativo'
 ];
 
+// Opciones de temas con luces y acentos dinámicos
+const TEMAS_DISPONIBLES = [
+  { id: 'purple', nombre: 'Violeta Clima', primary: '#a855f7', bgGlow: 'rgba(168, 85, 247, 0.25)' },
+  { id: 'emerald', nombre: 'Verde Neón', primary: '#10b981', bgGlow: 'rgba(16, 185, 129, 0.25)' },
+  { id: 'amber', nombre: 'Fuego / Rock', primary: '#f59e0b', bgGlow: 'rgba(245, 158, 11, 0.25)' },
+  { id: 'cyan', nombre: 'Cyberpunk', primary: '#06b6d4', bgGlow: 'rgba(6, 182, 212, 0.25)' },
+  { id: 'rose', nombre: 'Magenta / Punk', primary: '#f43f5e', bgGlow: 'rgba(244, 63, 94, 0.25)' },
+  { id: 'indigo', nombre: 'Azul Noche', primary: '#6366f1', bgGlow: 'rgba(99, 102, 241, 0.25)' },
+  { id: 'crimson', nombre: 'Amarillo brillante y cálido', primary: '#efde44', bgGlow: 'rgba(239, 68, 68, 0.25)' },
+  { id: 'lime', nombre: 'Verde Ácido', primary: '#84cc16', bgGlow: 'rgba(132, 204, 22, 0.25)' },
+];
+
 export default function FormularioBanda() {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
-  const [palabraClave, setPalabraClave] = useState(''); // <-- NUEVO: Estado para la palabra clave
+  const [palabraClave, setPalabraClave] = useState('');
   const [historia, setHistoria] = useState('');
   const [generosSeleccionados, setGenerosSeleccionados] = useState<string[]>([]);
+  const [temaColor, setTemaColor] = useState('purple'); // <-- Estado para el tema visual
   
   const [integrantes, setIntegrantes] = useState<{ nombre: string; instrumento: string }[]>([
     { nombre: '', instrumento: '' }
@@ -29,6 +42,8 @@ export default function FormularioBanda() {
   ]);
 
   const [enviando, setEnviando] = useState(false);
+
+  const temaActivo = TEMAS_DISPONIBLES.find((t) => t.id === temaColor) || TEMAS_DISPONIBLES[0];
 
   const manejarCambioGenero = (genero: string) => {
     if (generosSeleccionados.includes(genero)) {
@@ -83,16 +98,16 @@ export default function FormularioBanda() {
     try {
       const generoFinalString = generosSeleccionados.join(', ');
 
-      // Enviamos el email y la palabra clave elegida a Supabase
       const { data: bandaInsertada, error: errorBanda } = await supabase
         .from('bandas')
         .insert([
           {
             nombre,
             email,
-            palabra_clave: palabraClave, // <-- NUEVO: Se guarda en la columna correspondiente
+            palabra_clave: palabraClave,
             genero: generoFinalString,
             historia,
+            tema_color: temaColor, // <-- Se envía el tema elegido a Supabase
             aprobado: false
           }
         ])
@@ -139,8 +154,9 @@ export default function FormularioBanda() {
       // Reseteo de estados
       setNombre('');
       setEmail('');
-      setPalabraClave(''); // <-- Limpieza del estado
+      setPalabraClave('');
       setGenerosSeleccionados([]);
+      setTemaColor('purple');
       setHistoria('');
       setIntegrantes([{ nombre: '', instrumento: '' }]);
       setCanciones([{ titulo: '', spotify: '', youtube: '' }]);
@@ -172,7 +188,7 @@ export default function FormularioBanda() {
         
         {/* Nombre */}
         <div>
-          <label className={labelClass}>Nombre de la Agrupación</label>
+          <label className={labelClass}>Nombre de la Banda</label>
           <input 
             type="text" 
             value={nombre} 
@@ -183,9 +199,8 @@ export default function FormularioBanda() {
           />
         </div>
 
-        {/* Sección de Credenciales de Contacto y Seguridad */}
+        {/* Credenciales de Contacto y Seguridad */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Email */}
           <div>
             <label className={labelClass}>Correo Electrónico</label>
             <input 
@@ -198,11 +213,10 @@ export default function FormularioBanda() {
             />
           </div>
 
-          {/* NUEVO: Campo Palabra Clave */}
           <div>
             <label className={labelClass}>Palabra Clave de Edición</label>
             <input 
-              type="text" // Podés cambiarlo a "password" si preferís que no se vea al tipear
+              type="text" 
               value={palabraClave} 
               onChange={(e) => setPalabraClave(e.target.value)} 
               required 
@@ -240,6 +254,85 @@ export default function FormularioBanda() {
                 </label>
               );
             })}
+          </div>
+        </div>
+
+        {/* Selector de Apariencia / Tema + Vista Previa */}
+        <div className="pt-4 border-t border-border space-y-4">
+          <div>
+            <label className={labelClass}>Estilo Visual de su Página</label>
+            <p className="text-xs text-muted-foreground mb-3">
+              Seleccioná la paleta de colores para las luces de fondo y acentos cuando los usuarios visiten tu página individual.
+            </p>
+            
+            {/* Presets de Color */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {TEMAS_DISPONIBLES.map((t) => {
+                const seleccionado = temaColor === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTemaColor(t.id)}
+                    className={`p-3 rounded-xl border flex flex-col items-center gap-2 cursor-pointer transition-all ${
+                      seleccionado 
+                        ? 'border-white bg-white/10 scale-105 shadow-lg' 
+                        : 'border-border bg-background/40 hover:border-muted-foreground opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <div 
+                      className="w-5 h-5 rounded-full border border-white/20" 
+                      style={{ backgroundColor: t.primary }} 
+                    />
+                    <span className="text-xs font-medium text-foreground">{t.nombre}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Caja de Vista Previa Instantánea */}
+          <div className="space-y-1 pt-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
+              Vista previa de tu encabezado
+            </span>
+
+            <div className="relative overflow-hidden bg-[#0a0a0c] border border-border rounded-xl p-6 text-center transition-all duration-500">
+              {/* Luz resplandeciente de fondo */}
+              <div 
+                className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-28 blur-2xl pointer-events-none transition-all duration-500"
+                style={{ backgroundColor: temaActivo.bgGlow }}
+              />
+
+              <div className="relative z-10 space-y-2">
+                <span 
+                  className="inline-block text-[10px] font-bold uppercase tracking-widest bg-black/60 border border-border px-3 py-1 rounded-full transition-colors"
+                  style={{ color: temaActivo.primary }}
+                >
+                  {generosSeleccionados.length > 0 ? generosSeleccionados.join(', ') : 'Género Musical'}
+                </span>
+
+                <h4 className="text-2xl md:text-3xl font-black uppercase text-white tracking-tight">
+                  {nombre || 'Nombre de la Banda'}
+                </h4>
+
+                <p className="text-xs text-slate-400 max-w-md mx-auto line-clamp-2">
+                  {historia || 'Así se verá la biografía y las luces de fondo cuando los usuarios entren a tu página.'}
+                </p>
+
+                <div className="pt-2">
+                  <span 
+                    className="inline-block text-[10px] font-bold uppercase tracking-widest text-white px-4 py-2 rounded-lg transition-all"
+                    style={{ 
+                      backgroundColor: temaActivo.primary,
+                      boxShadow: `0 0 15px ${temaActivo.bgGlow}`
+                    }}
+                  >
+                    Escuchar Canciones
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

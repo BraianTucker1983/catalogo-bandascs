@@ -5,6 +5,7 @@ import PanelAdmin from './components/PanelAdmin';
 import ListaBandas from './components/ListaBandas';
 import EditarBanda from './components/EditarBanda';
 import DetalleBanda from './components/DetalleBanda';
+import Footer from './components/Footer';
 
 function App() {
   const [conexionOk, setConexionOk] = useState<boolean | null>(null);
@@ -29,6 +30,10 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session) => {
       const esAdminActivo = !!session?.user;
       setIsAdmin(esAdminActivo);
+      // Si se loguea como admin, lo llevamos automáticamente al panel admin
+      if (esAdminActivo) {
+        setPestaña('admin');
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -46,10 +51,15 @@ function App() {
     setPestaña('detalle');
   };
 
+  const manejarLogout = async () => {
+    await supabase.auth.signOut();
+    setPestaña('catalogo');
+  };
+
   return (
-    <div className="relative min-h-screen w-full bg-background text-foreground overflow-x-hidden antialiased py-12 px-4">
+    <div className="relative min-h-screen w-full bg-background text-foreground overflow-x-hidden antialiased flex flex-col justify-between">
       
-      {/* Efectos de Luces Ambientales (Glows de CLIMA) */}
+      {/* Luces Ambientales (Glows de CLIMA) */}
       <div
         className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] rounded-full opacity-15 blur-[130px] pointer-events-none z-0"
         style={{ background: "radial-gradient(circle, var(--glow-blue) 0%, transparent 75%)" }}
@@ -59,15 +69,15 @@ function App() {
         style={{ background: "radial-gradient(circle, var(--glow-violet) 0%, transparent 75%)" }}
       />
 
-      {/* Contenedor Principal */}
-      <div className="relative z-10 max-w-6xl mx-auto text-center">
+      {/* Contenido Principal Wrappeado */}
+      <div className="relative z-10 max-w-6xl mx-auto w-full text-center py-12 px-4 flex-1">
         
         {/* Título Principal */}
         <h1 className="text-3xl md:text-5xl font-black tracking-tight uppercase mb-2 text-white">
           🎸 Catálogo de Bandas de <span className="gradient-text">Coronel Suárez</span>
         </h1>
         
-        {/* Estado de Sincronización de Base de Datos */}
+        {/* Estado de Sincronización */}
         <div className="mb-8 text-sm font-semibold tracking-wide">
           {conexionOk === true && (
             <span className="text-emerald-400 flex items-center justify-center gap-2">
@@ -83,7 +93,7 @@ function App() {
           )}
         </div>
 
-        {/* Menú de Navegación de Pestañas (Solo si hay conexión y no estás en detalle) */}
+        {/* Menú de Navegación */}
         {conexionOk === true && pestaña !== 'detalle' && (
           <div className="mb-12 flex justify-center items-center gap-3 flex-wrap p-2 bg-card/40 border border-border rounded-xl backdrop-blur-md max-w-2xl mx-auto">
             <button 
@@ -124,7 +134,7 @@ function App() {
                 onClick={() => setPestaña('admin')}
                 className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   pestaña === 'admin' 
-                    ? 'bg-destructive text-white' 
+                    ? 'bg-destructive text-white shadow-lg shadow-destructive/20' 
                     : 'text-destructive/80 hover:text-destructive hover:bg-destructive/10'
                 }`}
               >
@@ -162,6 +172,13 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Footer Pro al final de la página */}
+      <Footer 
+        isAdmin={isAdmin} 
+        onLogout={manejarLogout} 
+        onNavegar={(destino) => setPestaña(destino)} 
+      />
     </div>
   );
 }

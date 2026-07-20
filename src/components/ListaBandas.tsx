@@ -32,11 +32,7 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
   const [bandas, setBandas] = useState<BandaCompleta[]>([]);
   const [cargando, setCargando] = useState(true);
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
-
   const [isAdmin, setIsAdmin] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [mostrarLoginForm, setMostrarLoginForm] = useState(false);
 
   useEffect(() => {
     const traerBandasPublicas = async () => {
@@ -74,22 +70,6 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
     };
   }, []);
 
-  const manejarLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      alert(`Error de ingreso: ${error.message}`);
-    } else {
-      setMostrarLoginForm(false);
-      setEmail('');
-      setPassword('');
-    }
-  };
-
-  const manejarLogout = async () => {
-    await supabase.auth.signOut();
-  };
-
   const manejarEliminarBanda = async (e: React.MouseEvent, id: string, nombre: string) => {
     e.stopPropagation(); 
     const confirmar = window.confirm(`¿Estás seguro de eliminar permanentemente a "${nombre}"?`);
@@ -120,63 +100,13 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12 relative text-foreground">
-      
-      {/* Panel Administrador */}
-      <div className="absolute top-0 right-4 z-20">
-        {!isAdmin ? (
-          <div className="relative">
-            <button 
-              onClick={() => setMostrarLoginForm(!mostrarLoginForm)}
-              className="text-xs font-semibold px-3 py-1.5 rounded bg-muted hover:bg-secondary text-white/80 border border-border transition-colors cursor-pointer"
-            >
-              {mostrarLoginForm ? 'Cerrar' : '🔒 Acceso Admin'}
-            </button>
-
-            {mostrarLoginForm && (
-              <form 
-                onSubmit={manejarLogin} 
-                className="absolute right-0 mt-2 p-4 bg-card rounded-lg border border-border flex flex-col gap-3 w-56 shadow-2xl backdrop-blur-md"
-              >
-                <input 
-                  type="email" 
-                  placeholder="Email" 
-                  value={email} 
-                  onChange={(e) => setEmail(e.target.value)}
-                  required 
-                  className="p-2 text-sm bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
-                />
-                <input 
-                  type="password" 
-                  placeholder="Contraseña" 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)}
-                  required 
-                  className="p-2 text-sm bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary"
-                />
-                <button 
-                  type="submit" 
-                  className="bg-primary hover:opacity-90 text-white py-2 rounded text-sm font-bold transition-opacity cursor-pointer"
-                >
-                  Ingresar
-                </button>
-              </form>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 bg-card p-2 rounded-lg border border-border shadow-md">
-            <span className="text-xs text-emerald-400 flex items-center gap-1.5 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Panel de Control
-            </span>
-            <button 
-              onClick={manejarLogout} 
-              className="bg-destructive hover:opacity-90 text-white text-xs px-2 py-1 rounded transition-opacity cursor-pointer"
-            >
-              Salir
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Indicador discreto si la sesión admin ya está activa */}
+      {isAdmin && (
+        <div className="absolute top-0 right-4 z-20 flex items-center gap-2 bg-card px-3 py-1.5 rounded-lg border border-border shadow-md">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs text-emerald-400 font-medium">Modo Admin Activo</span>
+        </div>
+      )}
 
       {/* Encabezado */}
       <div className="text-center mb-16 relative">
@@ -191,15 +121,12 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
           No hay bandas cargadas de forma pública todavía.
         </p>
       ) : (
-        /* SOLUCIÓN: Cambiado a un contenedor de lectura amplio y centrado */
         <div className="max-w-4xl mx-auto w-full">
-          {/* SOLUCIÓN: grid-cols-1 estricto para asegurar la orientación vertical */}
           <div className="grid grid-cols-1 gap-6 w-full">
             {bandas.map((banda) => (
-              /* SOLUCIÓN: w-full sin límites chicos para que abarque el ancho */
               <div key={banda.id} className="w-full">
                 <Tilt
-                  tiltMaxAngleX={3} // Bajado un poco el ángulo para que no distorsione al ser una card ancha
+                  tiltMaxAngleX={3}
                   tiltMaxAngleY={3}
                   perspective={1500}
                   scale={1.01}
@@ -223,7 +150,6 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
                       </button>
                     )}
 
-                    {/* SOLUCIÓN: Disposición horizontal interna en pantallas medianas/grandes */}
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
                       <div className="space-y-2 flex-1">
                         <div className="flex flex-wrap items-baseline gap-3">
@@ -235,13 +161,11 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
                           </span>
                         </div>
                         
-                        {/* Aumentado a line-clamp-3 para biografías un poco más completas en el listado */}
                         <p className="text-sm text-muted-foreground leading-relaxed text-justify line-clamp-3 pt-1">
                           {banda.historia || 'Sin biografía disponible en los registros del sitio.'}
                         </p>
                       </div>
 
-                      {/* Acción inferior alineada a la derecha en pantallas grandes */}
                       <div className="md:self-center shrink-0 flex justify-end group pt-4 md:pt-0">
                         <span className="text-xs font-bold uppercase tracking-wider text-white/70 group-hover:text-primary transition-colors flex items-center gap-1 bg-background/40 md:bg-transparent px-3 py-2 md:p-0 rounded-lg border border-border/40 md:border-transparent">
                           Ver Legajo 
