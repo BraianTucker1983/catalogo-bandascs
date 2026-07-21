@@ -111,7 +111,7 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
       {/* Encabezado */}
       <div className="text-center mb-16 relative">
         <h2 className="text-3xl md:text-5xl font-black tracking-wider uppercase mb-3 text-white">
-          Catálogo de <span className="gradient-text">Bandas</span>
+          Artistas <span className="gradient-text">Locales</span>
         </h2>
         <div className="w-24 h-1 bg-gradient-to-r from-primary to-accent mx-auto rounded-full" />
       </div>

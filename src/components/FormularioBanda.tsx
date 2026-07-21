@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import emailjs from '@emailjs/browser';
 import { supabase } from '../lib/supabaseClient';
 
 const GENEROS_DISPONIBLES = [
@@ -21,7 +22,7 @@ const TEMAS_DISPONIBLES = [
   { id: 'cyan', nombre: 'Cyberpunk', primary: '#06b6d4', bgGlow: 'rgba(6, 182, 212, 0.25)' },
   { id: 'rose', nombre: 'Magenta / Punk', primary: '#f43f5e', bgGlow: 'rgba(244, 63, 94, 0.25)' },
   { id: 'indigo', nombre: 'Azul Noche', primary: '#6366f1', bgGlow: 'rgba(99, 102, 241, 0.25)' },
-  { id: 'crimson', nombre: 'Amarillo brillante y cálido', primary: '#efde44', bgGlow: 'rgba(239, 68, 68, 0.25)' },
+  { id: 'crimson', nombre: 'Amarillo brillante', primary: '#efde44', bgGlow: 'rgba(239, 222, 68, 0.25)' },
   { id: 'lime', nombre: 'Verde Ácido', primary: '#84cc16', bgGlow: 'rgba(132, 204, 22, 0.25)' },
 ];
 
@@ -31,7 +32,7 @@ export default function FormularioBanda() {
   const [palabraClave, setPalabraClave] = useState('');
   const [historia, setHistoria] = useState('');
   const [generosSeleccionados, setGenerosSeleccionados] = useState<string[]>([]);
-  const [temaColor, setTemaColor] = useState('purple'); // <-- Estado para el tema visual
+  const [temaColor, setTemaColor] = useState('purple');
   
   const [integrantes, setIntegrantes] = useState<{ nombre: string; instrumento: string }[]>([
     { nombre: '', instrumento: '' }
@@ -98,6 +99,7 @@ export default function FormularioBanda() {
     try {
       const generoFinalString = generosSeleccionados.join(', ');
 
+      // 1. Guardar datos de la banda en Supabase
       const { data: bandaInsertada, error: errorBanda } = await supabase
         .from('bandas')
         .insert([
@@ -107,7 +109,7 @@ export default function FormularioBanda() {
             palabra_clave: palabraClave,
             genero: generoFinalString,
             historia,
-            tema_color: temaColor, // <-- Se envía el tema elegido a Supabase
+            tema_color: temaColor,
             aprobado: false
           }
         ])
@@ -118,6 +120,7 @@ export default function FormularioBanda() {
 
       const bandaId = bandaInsertada.id;
 
+      // 2. Guardar Integrantes
       const integrantesFiltrados = integrantes
         .filter(i => i.nombre.trim() !== '')
         .map(i => ({
@@ -133,6 +136,7 @@ export default function FormularioBanda() {
         if (errorIntegrantes) throw errorIntegrantes;
       }
 
+      // 3. Guardar Canciones
       const cancionesFiltradas = canciones
         .filter(c => c.titulo.trim() !== '')
         .map(c => ({
@@ -149,7 +153,25 @@ export default function FormularioBanda() {
         if (errorCanciones) throw errorCanciones;
       }
 
-      alert('¡Inscripción completada! Tu banda se envió para revisión del administrador.');
+      // 4. Envío del correo vía EmailJS
+      try {
+        await emailjs.send(
+          'service_lth9njw',   // <-- Colocá tu Service ID de EmailJS
+          'template_o83d6ph',  // <-- Colocá tu Template ID de EmailJS
+          {
+            nombre_banda: nombre,      // Coincide con {{nombre_banda}}
+            to_email: email,           // Campo "To Email" en la interfaz de EmailJS
+            clave: palabraClave,       // Coincide con {{clave}}
+            genero: generoFinalString,
+          },
+          'se4gVL7DjUFdcuO9f'    // <-- Colocá tu Public Key de EmailJS
+        );
+      } catch (errEmail) {
+        console.error("Error al enviar email de confirmación:", errEmail);
+        // Continuamos la ejecución para avisar que los datos sí se registraron correctamente
+      }
+
+      alert('¡Inscripción completada! Tu banda se envió para revisión del administrador y te enviamos un correo de confirmación con tu palabra clave.');
       
       // Reseteo de estados
       setNombre('');
@@ -226,7 +248,7 @@ export default function FormularioBanda() {
           </div>
         </div>
         <span className="text-xs text-muted-foreground -mt-2 block">
-          Guardá bien esta palabra clave. La necesitarás junto a tu correo si deseás modificar o actualizar los datos de la banda más adelante.
+          Guardá bien esta palabra clave. Te llegará a tu correo y la necesitarás si deseás modificar o actualizar los datos más adelante.
         </span>
 
         {/* Checkboxes de Géneros */}
