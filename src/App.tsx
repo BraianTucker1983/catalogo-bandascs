@@ -1,186 +1,187 @@
 import { useEffect, useState } from 'react';
-import { supabase } from './lib/supabaseClient'; 
-import FormularioBanda from './components/FormularioBanda';
-import PanelAdmin from './components/PanelAdmin';
+import { supabase } from './lib/supabaseClient';
+
+// Importación de componentes principales
+import Header from './components/Header'; // 👈 IMPORTANTE: Importamos el Header
 import ListaBandas from './components/ListaBandas';
-import EditarBanda from './components/EditarBanda';
-import DetalleBanda from './components/DetalleBanda';
+import LandingBanda from './components/LandingBanda'; 
+import FormularioBanda from './components/FormularioBanda'; 
+import AdminPanel from './components/PanelAdmin'; 
 import Footer from './components/Footer';
 
-function App() {
-  const [conexionOk, setConexionOk] = useState<boolean | null>(null);
-  const [pestaña, setPestaña] = useState<'catalogo' | 'formulario' | 'admin' | 'editar' | 'detalle'>('catalogo'); 
-  const [bandaSeleccionadaId, setBandaSeleccionadaId] = useState<string | null>(null);
+// Definición de las vistas posibles en la app
+type Vista = 'catalogo' | 'detalle' | 'formulario' | 'editar' | 'admin';
+
+export default function App() {
+  // Estado de navegación
+  const [vista, setVista] = useState<Vista>('catalogo');
+  const [bandaId, setBandaId] = useState<string | null>(null);
+
+  // Estado de autenticación
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Efecto 1: Verificar conexión a Supabase y escuchar auth
+  // Estados de diagnóstico de conexión
+  const [testCount, setTestCount] = useState<number | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [mostrarDebug, setMostrarDebug] = useState(false);
+
+  // 1. Escuchar la sesión de Supabase en tiempo real
   useEffect(() => {
-    const verificarConexion = async () => {
-      const { error } = await supabase.from('bandas').select('*').limit(1);
-      if (error) {
-        console.error('Error de conexión:', error.message);
-        setConexionOk(false);
-      } else {
-        setConexionOk(true);
-      }
-    };
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAdmin(!!session);
+    });
 
-    verificarConexion();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const autenticado = !!session;
+      setIsAdmin(autenticado);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session) => {
-      const esAdminActivo = !!session?.user;
-      setIsAdmin(esAdminActivo);
-      // Si se loguea como admin, lo llevamos automáticamente al panel admin
-      if (esAdminActivo) {
-        setPestaña('admin');
+      if (!autenticado && vista === 'admin') {
+        setVista('catalogo');
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []); 
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [vista]);
 
-  // Efecto 2: Proteger pestaña admin
+  // 2. Probar conexión inicial con Supabase
   useEffect(() => {
-    if (!isAdmin && pestaña === 'admin') {
-      setPestaña('catalogo');
+    async function probarConexion() {
+      try {
+        const { data, error } = await supabase.from('bandas').select('id', { count: 'exact' });
+        if (error) {
+          setTestError(error.message);
+        } else {
+          setTestCount(data ? data.length : 0);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Error al conectar';
+        setTestError(msg);
+      }
     }
-  }, [isAdmin, pestaña]);
+    probarConexion();
+  }, []);
 
-  const verDetalleDeBanda = (id: string) => {
-    setBandaSeleccionadaId(id);
-    setPestaña('detalle');
+  // Handlers de navegación
+  const handleSeleccionarBanda = (id: string) => {
+    setBandaId(id);
+    setVista('detalle');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const manejarLogout = async () => {
+  const handleNavegar = (nuevaVista: Vista) => {
+    if (nuevaVista !== 'detalle') {
+      setBandaId(null);
+    }
+    setVista(nuevaVista);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogout = async () => {
     await supabase.auth.signOut();
-    setPestaña('catalogo');
+    setVista('catalogo');
+    setBandaId(null);
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-background text-foreground overflow-x-hidden antialiased flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-primary selection:text-white relative overflow-x-hidden">
       
-      {/* Luces Ambientales (Glows de CLIMA) */}
-      <div
-        className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] rounded-full opacity-15 blur-[130px] pointer-events-none z-0"
-        style={{ background: "radial-gradient(circle, var(--glow-blue) 0%, transparent 75%)" }}
-      />
-      <div
-        className="absolute bottom-10 right-[-5%] w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] pointer-events-none z-0"
-        style={{ background: "radial-gradient(circle, var(--glow-violet) 0%, transparent 75%)" }}
-      />
+      {/* Glow de fondo decorativo */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-primary/10 blur-[120px] pointer-events-none rounded-full" />
 
-      {/* Contenido Principal Wrappeado */}
-      <div className="relative z-10 max-w-6xl mx-auto w-full text-center py-12 px-4 flex-1">
-        
-        {/* Título Principal */}
-        <h1 className="text-3xl md:text-5xl font-black tracking-tight uppercase mb-2 text-white">
-          🎸 Catálogo de Bandas de <span className="gradient-text">Coronel Suárez</span>
-        </h1>
-        
-        {/* Estado de Sincronización */}
-        <div className="mb-8 text-sm font-semibold tracking-wide">
-          {conexionOk === true && (
-            <span className="text-emerald-400 flex items-center justify-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Base de datos sincronizada
-            </span>
-          )}
-          {conexionOk === false && (
-            <span className="text-destructive flex items-center justify-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-destructive" />
-              Error de sincronización con el servidor
-            </span>
-          )}
-        </div>
+      {/* 🚀 HEADER INTEGRADO */}
+      <Header onNavegar={handleNavegar} vistaActual={vista} />
 
-        {/* Menú de Navegación */}
-        {conexionOk === true && pestaña !== 'detalle' && (
-          <div className="mb-12 flex justify-center items-center gap-3 flex-wrap p-2 bg-card/40 border border-border rounded-xl backdrop-blur-md max-w-2xl mx-auto">
-            <button 
-              onClick={() => setPestaña('catalogo')}
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                pestaña === 'catalogo' 
-                  ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-              }`}
-            >
-              Catálogo Público 🎵
-            </button>
-            
-            <button 
-              onClick={() => setPestaña('formulario')}
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                pestaña === 'formulario' 
-                  ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-              }`}
-            >
-              Registrar Banda
-            </button>
-
-            <button 
-              onClick={() => setPestaña('editar')}
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                pestaña === 'editar' 
-                  ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-              }`}
-            >
-              Editar mi Banda ✏️
-            </button>
-            
-            {isAdmin && (
-              <button 
-                onClick={() => setPestaña('admin')}
-                className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  pestaña === 'admin' 
-                    ? 'bg-destructive text-white shadow-lg shadow-destructive/20' 
-                    : 'text-destructive/80 hover:text-destructive hover:bg-destructive/10'
-                }`}
-              >
-                Panel Admin 🛡️
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Vistas Dinámicas */}
-        {conexionOk === true && (
-          <div className="w-full text-left transition-all duration-300">
-            {pestaña === 'catalogo' && (
-              <ListaBandas onSeleccionarBanda={verDetalleDeBanda} />
-            )}
-
-            {pestaña === 'formulario' && (
-              <FormularioBanda />
-            )}
-
-            {pestaña === 'editar' && (
-              <EditarBanda />
-            )}
-            
-            {pestaña === 'detalle' && bandaSeleccionadaId && (
-              <DetalleBanda 
-                bandaId={bandaSeleccionadaId} 
-                onVolver={() => setPestaña('catalogo')} 
-              />
-            )}
-            
-            {pestaña === 'admin' && isAdmin && (
-              <PanelAdmin />
-            )}
-          </div>
-        )}
+      {/* Barra de estado rápido/Debug (Opcional) */}
+      <div className="w-full max-w-6xl mx-auto px-6 pt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setMostrarDebug(!mostrarDebug)}
+          className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-0.5 rounded border border-border/30 bg-card/40 cursor-pointer"
+          title="Alternar estado de conexión"
+        >
+          {testError ? '🔴 Error DB' : `🟢 DB: ${testCount ?? '...'}`}
+        </button>
       </div>
 
-      {/* Footer Pro al final de la página */}
+      {/* Panel de Diagnóstico Colapsable */}
+      {mostrarDebug && (
+        <div className="bg-yellow-500/10 border-b border-yellow-500/20 py-2 px-6 text-xs font-mono text-yellow-300/90 flex items-center justify-between max-w-6xl mx-auto w-full z-30 my-2">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span><strong>Registros DB:</strong> {testCount !== null ? testCount : 'Cargando...'}</span>
+            <span>|</span>
+            <span><strong>Vista Actual:</strong> {vista}</span>
+            {bandaId && <span>| <strong>ID Banda:</strong> {bandaId}</span>}
+            {testError && <span className="text-red-400">| <strong>Error:</strong> {testError}</span>}
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setMostrarDebug(false)}
+            className="text-yellow-400 hover:text-white ml-2 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Contenido Principal Dinámico */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 relative z-10">
+        
+        {/* Vista 1: Detalle de Banda */}
+        {vista === 'detalle' && bandaId && (
+          <LandingBanda 
+            bandaId={bandaId} 
+            onVolver={() => handleNavegar('catalogo')} 
+          />
+        )}
+
+        {/* Vista 2: Catálogo Principal */}
+        {vista === 'catalogo' && (
+          <ListaBandas 
+            onSeleccionarBanda={handleSeleccionarBanda} 
+          />
+        )}
+
+        {/* Vista 3: Formulario de Postulación de Banda */}
+        {vista === 'formulario' && (
+          <FormularioBanda 
+            onExito={() => handleNavegar('catalogo')}
+            onCancelar={() => handleNavegar('catalogo')}
+          />
+        )}
+
+        {/* Vista 4: Solicitud de Edición */}
+        {vista === 'editar' && (
+          <div className="max-w-2xl mx-auto text-center py-12 space-y-4">
+            <h2 className="text-2xl font-bold">Solicitar modificación de datos</h2>
+            <p className="text-sm text-muted-foreground">
+              Para actualizar la biografía, integrantes o material multimedia de tu banda, ponete en contacto con el equipo de administración.
+            </p>
+            <button
+              type="button"
+              onClick={() => handleNavegar('catalogo')}
+              className="px-4 py-2 bg-card border border-border rounded-xl text-xs font-bold uppercase tracking-wider hover:border-primary transition-colors cursor-pointer"
+            >
+              ← Volver al catálogo
+            </button>
+          </div>
+        )}
+
+        {/* Vista 5: Panel de Administración */}
+        {vista === 'admin' && (
+          <AdminPanel />
+        )}
+
+      </main>
+
+      {/* Pie de Página */}
       <Footer 
-        isAdmin={isAdmin} 
-        onLogout={manejarLogout} 
-        onNavegar={(destino) => setPestaña(destino)} 
+        isAdmin={isAdmin}
+        onLogout={handleLogout}
+        onNavegar={handleNavegar}
       />
+
     </div>
   );
 }
-
-export default App;

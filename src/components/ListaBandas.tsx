@@ -1,27 +1,14 @@
 import { useEffect, useState } from 'react';
-import Tilt from 'react-parallax-tilt';
 import { supabase } from '../lib/supabaseClient';
 
-interface Integrante {
-  id: string;
-  nombre: string;
-  instrumento: string | null;
-}
-
-interface Cancion {
-  id: string;
-  titulo: string;
-  spotify_embed_url: string | null;
-  youtube_embed_url: string | null;
-}
-
-interface BandaCompleta {
-  id: string;
-  nombre: string;
-  genero: string;
-  historia: string;
-  integrantes: Integrante[];
-  canciones: Cancion[];
+export interface Banda {
+  id: string | number;
+  nombre?: string | null;
+  genero?: string | null;
+  historia?: string | null;
+  foto_portada?: string | null;
+  instagram_url?: string | null;
+  tema_color?: string | null;
 }
 
 interface ListaBandasProps {
@@ -29,158 +16,175 @@ interface ListaBandasProps {
 }
 
 export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
-  const [bandas, setBandas] = useState<BandaCompleta[]>([]);
+  const [bandas, setBandas] = useState<Banda[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const traerBandasPublicas = async () => {
+    let cancelado = false;
+
+    const obtenerBandas = async () => {
       try {
         setCargando(true);
+        setErrorMsg(null);
+
         const { data, error } = await supabase
           .from('bandas')
-          .select(`
-            id, 
-            nombre, 
-            genero, 
-            historia,
-            integrantes(id, nombre, instrumento),
-            canciones(id, titulo, spotify_embed_url, youtube_embed_url)
-          `)
-          .eq('aprobado', true);
+          .select('*')
+          .order('nombre', { ascending: true });
 
-        if (error) throw error;
-        setBandas((data as unknown as BandaCompleta[]) || []);
-      } catch (error: any) {
-        console.error('Error al traer el catálogo:', error.message);
+        if (error) {
+          console.error('Error Supabase ListaBandas:', error);
+          throw new Error(error.message);
+        }
+
+        if (!cancelado) {
+          setBandas(data || []);
+        }
+      } catch (err: unknown) {
+        if (!cancelado) {
+          const mensaje = err instanceof Error ? err.message : String(err);
+          setErrorMsg('No se pudieron obtener las bandas del catálogo.');
+          console.error('Error detallado:', mensaje);
+        }
       } finally {
-        setCargando(false);
+        if (!cancelado) {
+          setCargando(false);
+        }
       }
     };
 
-    traerBandasPublicas();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAdmin(!!session?.user);
-    });
+    obtenerBandas();
 
     return () => {
-      subscription.unsubscribe();
+      cancelado = true;
     };
   }, []);
 
-  const manejarEliminarBanda = async (e: React.MouseEvent, id: string, nombre: string) => {
-    e.stopPropagation(); 
-    const confirmar = window.confirm(`¿Estás seguro de eliminar permanentemente a "${nombre}"?`);
-    if (!confirmar) return;
-
-    setEliminandoId(id);
-    try {
-      const { error } = await supabase.from('bandas').delete().eq('id', id);
-      if (error) throw error;
-      setBandas((prevBandas) => prevBandas.filter((b) => b.id !== id));
-      alert('Eliminada con éxito.');
-    } catch (error: any) {
-      console.error(error.message);
-    } finally {
-      setEliminandoId(null);
+  const handleSeleccionar = (id: string | number) => {
+    if (id !== undefined && id !== null && onSeleccionarBanda) {
+      onSeleccionarBanda(String(id));
     }
   };
 
   if (cargando) {
     return (
-      <div className="flex justify-center items-center min-h-[300px]">
-        <p className="text-muted-foreground font-medium animate-pulse text-lg tracking-wider">
-          Sincronizando catálogo de bandas...
+      <div className="flex flex-col justify-center items-center min-h-[300px] gap-3">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-muted-foreground font-medium animate-pulse text-sm uppercase tracking-wider">
+          Cargando catálogo de bandas...
+        </p>
+      </div>
+    );
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="max-w-md mx-auto my-10 p-6 rounded-xl border border-destructive/30 bg-destructive/10 text-center">
+        <p className="text-destructive font-semibold text-sm mb-4">{errorMsg}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  if (bandas.length === 0) {
+    return (
+      <div className="text-center py-16 px-4 border border-dashed border-border/40 rounded-xl">
+        <p className="text-muted-foreground text-base italic">
+          No hay bandas registradas en el catálogo aún.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-12 relative text-foreground">
-      {/* Indicador discreto si la sesión admin ya está activa */}
-      {isAdmin && (
-        <div className="absolute top-0 right-4 z-20 flex items-center gap-2 bg-card px-3 py-1.5 rounded-lg border border-border shadow-md">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs text-emerald-400 font-medium">Modo Admin Activo</span>
-        </div>
-      )}
-
-      {/* Encabezado */}
-      <div className="text-center mb-16 relative">
-        <h2 className="text-3xl md:text-5xl font-black tracking-wider uppercase mb-3 text-white">
-          Artistas <span className="gradient-text">Locales</span>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between border-b border-border/40 pb-4">
+        <h2 className="text-2xl font-black uppercase tracking-wider text-white">
+          <span className="text-primary">///</span> Artistas & Bandas
         </h2>
-        <div className="w-24 h-1 bg-gradient-to-r from-primary to-accent mx-auto rounded-full" />
+        <span className="text-xs font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full">
+          {bandas.length} {bandas.length === 1 ? 'registrada' : 'registradas'}
+        </span>
       </div>
 
-      {bandas.length === 0 ? (
-        <p className="text-muted-foreground text-center italic tracking-wide">
-          No hay bandas cargadas de forma pública todavía.
-        </p>
-      ) : (
-        <div className="max-w-4xl mx-auto w-full">
-          <div className="grid grid-cols-1 gap-6 w-full">
-            {bandas.map((banda) => (
-              <div key={banda.id} className="w-full">
-                <Tilt
-                  tiltMaxAngleX={3}
-                  tiltMaxAngleY={3}
-                  perspective={1500}
-                  scale={1.01}
-                  transitionSpeed={1400}
-                  glareEnable={true}
-                  glareMaxOpacity={0.07}
-                  glareColor="#ffffff"
-                  style={{ display: 'flex', width: '100%' }}
-                >
-                  <div 
-                    onClick={() => onSeleccionarBanda(banda.id)}
-                    className="member-card p-6 flex flex-col justify-between w-full cursor-pointer relative"
-                  >
-                    {isAdmin && (
-                      <button
-                        onClick={(e) => manejarEliminarBanda(e, banda.id, banda.nombre)}
-                        disabled={eliminandoId === banda.id}
-                        className="absolute top-4 right-4 bg-destructive text-white p-1.5 rounded-full hover:scale-105 active:scale-95 transition-transform z-30 flex items-center justify-center w-6 h-6 text-xs font-bold"
-                      >
-                        ✕
-                      </button>
-                    )}
+      {/* Grid de Tarjetas de Bandas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {bandas.map((banda, idx) => {
+          // Valores seguros defensivos
+          const nombreBanda = banda.nombre || 'Sin nombre';
+          const inicial = nombreBanda.charAt(0).toUpperCase();
+          const tieneFoto = typeof banda.foto_portada === 'string' && banda.foto_portada.trim().length > 0;
+          const keyUnica = banda.id ? String(banda.id) : `banda-${idx}`;
 
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-                      <div className="space-y-2 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-3">
-                          <h3 className="text-2xl font-black tracking-tight text-white">
-                            {banda.nombre}
-                          </h3>
-                          <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded">
-                            {banda.genero}
-                          </span>
-                        </div>
-                        
-                        <p className="text-sm text-muted-foreground leading-relaxed text-justify line-clamp-3 pt-1">
-                          {banda.historia || 'Sin biografía disponible en los registros del sitio.'}
-                        </p>
-                      </div>
-
-                      <div className="md:self-center shrink-0 flex justify-end group pt-4 md:pt-0">
-                        <span className="text-xs font-bold uppercase tracking-wider text-white/70 group-hover:text-primary transition-colors flex items-center gap-1 bg-background/40 md:bg-transparent px-3 py-2 md:p-0 rounded-lg border border-border/40 md:border-transparent">
-                          Ver Legajo 
-                          <span className="transform translate-x-0 group-hover:translate-x-1 transition-transform">→</span>
-                        </span>
-                      </div>
-                    </div>
-
+          return (
+            <article
+              key={keyUnica}
+              onClick={() => handleSeleccionar(banda.id)}
+              className="group relative rounded-2xl border border-border/50 bg-card overflow-hidden hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer flex flex-col"
+            >
+              {/* Cabecera / Imagen de Portada */}
+              <div className="relative h-44 w-full bg-muted/40 overflow-hidden">
+                {tieneFoto ? (
+                  <img
+                    src={banda.foto_portada!}
+                    alt={nombreBanda}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-card">
+                    <span className="text-4xl font-black text-primary/40 uppercase">
+                      {inicial}
+                    </span>
                   </div>
-                </Tilt>
+                )}
+
+                {/* Tag de Género */}
+                {banda.genero && (
+                  <div className="absolute top-3 left-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white bg-black/60 backdrop-blur px-2.5 py-1 rounded-md border border-white/10">
+                      {banda.genero}
+                    </span>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+
+              {/* Contenido de la Tarjeta */}
+              <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="text-xl font-bold text-white group-hover:text-primary transition-colors line-clamp-1">
+                    {nombreBanda}
+                  </h3>
+                  {banda.historia && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-2 leading-relaxed">
+                      {banda.historia}
+                    </p>
+                  )}
+                </div>
+
+                {/* Botón de Selección con Click Directo */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSeleccionar(banda.id);
+                  }}
+                  className="w-full pt-2 border-t border-border/30 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary hover:text-white transition-colors cursor-pointer"
+                >
+                  <span>Ver legajo completo</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </div>
   );
 }
