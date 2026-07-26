@@ -6,7 +6,7 @@ import Header from './components/Header';
 import ListaBandas from './components/ListaBandas';
 import LandingBanda from './components/LandingBanda'; 
 import FormularioBanda from './components/FormularioBanda'; 
-import EditarBanda from './components/EditarBanda'; // 👈 1. Importado
+import EditarBanda from './components/EditarBanda';
 import AdminPanel from './components/PanelAdmin'; 
 import Footer from './components/Footer';
 
@@ -72,7 +72,8 @@ export default function App() {
   };
 
   const handleNavegar = (nuevaVista: Vista) => {
-    if (nuevaVista !== 'detalle') {
+    // Mantener el bandaId si vamos a ver detalle
+    if (nuevaVista !== 'detalle' && nuevaVista !== 'editar') {
       setBandaId(null);
     }
     setVista(nuevaVista);
@@ -154,7 +155,7 @@ export default function App() {
 
         {/* Vista 4: Edición de Perfil con Clave Secreta */}
         {vista === 'editar' && (
-          <EditarBanda /> // 👈 2. Componente real montado
+          <EditarBanda />
         )}
 
         {/* Vista 5: Panel de Administración */}

@@ -57,6 +57,8 @@ async function convertirAWebp(archivo: File, maxAncho = 1200, calidad = 0.8): Pr
         const ctx = canvas.getContext('2d');
         if (!ctx) return reject(new Error('Error al obtener contexto Canvas'));
 
+        // Limpiar canvas preservando canal Alfa para imágenes transparentes
+        ctx.clearRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob(
@@ -92,6 +94,7 @@ async function subirImagenSupabase(blob: Blob, rutaNombre: string): Promise<stri
 }
 
 interface IntegranteEstado {
+  id: string;
   nombre: string;
   instrumento: string;
   instagram_url: string;
@@ -99,10 +102,32 @@ interface IntegranteEstado {
   fotoPreviewUrl?: string | null;
 }
 
+interface CancionEstado {
+  id: string;
+  titulo: string;
+  spotify: string;
+  youtube: string;
+}
+
 interface FormularioBandaProps {
   onExito?: () => void;
   onCancelar?: () => void;
 }
+
+const crearItemVacioIntegrante = (): IntegranteEstado => ({
+  id: crypto.randomUUID(),
+  nombre: '',
+  instrumento: '',
+  instagram_url: '',
+  fotoFile: null,
+});
+
+const crearItemVacioCancion = (): CancionEstado => ({
+  id: crypto.randomUUID(),
+  titulo: '',
+  spotify: '',
+  youtube: '',
+});
 
 export default function FormularioBanda({ onExito, onCancelar }: FormularioBandaProps) {
   const [nombre, setNombre] = useState('');
@@ -116,17 +141,11 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
   const [portadaFile, setPortadaFile] = useState<File | null>(null);
   const [portadaPreview, setPortadaPreview] = useState<string | null>(null);
 
-  const [integrantes, setIntegrantes] = useState<IntegranteEstado[]>([
-    { nombre: '', instrumento: '', instagram_url: '', fotoFile: null }
-  ]);
-
-  const [canciones, setCanciones] = useState<{ titulo: string; spotify: string; youtube: string }[]>([
-    { titulo: '', spotify: '', youtube: '' }
-  ]);
+  const [integrantes, setIntegrantes] = useState<IntegranteEstado[]>([crearItemVacioIntegrante()]);
+  const [canciones, setCanciones] = useState<CancionEstado[]>([crearItemVacioCancion()]);
 
   const [enviando, setEnviando] = useState(false);
 
-  // Mantener referencias actualizadas de URLs Blob para limpiar en unmount sin leaks
   const activeObjectUrls = useRef<Set<string>>(new Set());
 
   const crearObjectUrl = (file: File): string => {
@@ -144,7 +163,6 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
 
   useEffect(() => {
     return () => {
-      // Limpiar de forma segura todas las URLs generadas al desmontar el componente
       activeObjectUrls.current.forEach((url) => URL.revokeObjectURL(url));
       activeObjectUrls.current.clear();
     };
@@ -190,10 +208,7 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
   };
 
   const agregarIntegrante = () => {
-    setIntegrantes((prev) => [
-      ...prev,
-      { nombre: '', instrumento: '', instagram_url: '', fotoFile: null }
-    ]);
+    setIntegrantes((prev) => [...prev, crearItemVacioIntegrante()]);
   };
 
   const eliminarIntegrante = (index: number) => {
@@ -212,7 +227,7 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
   };
 
   const agregarCancion = () => {
-    setCanciones((prev) => [...prev, { titulo: '', spotify: '', youtube: '' }]);
+    setCanciones((prev) => [...prev, crearItemVacioCancion()]);
   };
 
   const eliminarCancion = (index: number) => {
@@ -231,18 +246,20 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
 
     setEnviando(true);
     let bandaIdInsertada: string | null = null;
+    let fotosSubidas: string[] = []; // Tracking de rutas para limpieza si hay error
 
     try {
       const generoFinalString = generosSeleccionados.join(', ');
       const timeStamp = Date.now();
       const slugNombre = sanitizarNombreArchivo(nombre);
 
-      // 1. Portada
+      // 1. Preparar/Subir Portada
       let fotoPortadaUrl: string | null = null;
       if (portadaFile) {
         const webpBlob = await convertirAWebp(portadaFile, 1400, 0.85);
         const ruta = `portadas/${timeStamp}_${slugNombre}.webp`;
         fotoPortadaUrl = await subirImagenSupabase(webpBlob, ruta);
+        fotosSubidas.push(ruta);
       }
 
       // 2. Inserción de la banda
@@ -279,6 +296,7 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
               const slugMiembro = sanitizarNombreArchivo(m.nombre);
               const ruta = `integrantes/${bandaIdInsertada}_${Date.now()}_${slugMiembro}.webp`;
               fotoMiembroUrl = await subirImagenSupabase(webpBlob, ruta);
+              fotosSubidas.push(ruta);
             }
 
             return {
@@ -316,7 +334,7 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
         if (errorCanciones) throw errorCanciones;
       }
 
-      // 5. Envío de Email mediante Variables de Entorno (Recomendado)
+      // 5. Envío de Email mediante EmailJS
       try {
         const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_lth9njw';
         const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_o83d6ph';
@@ -352,15 +370,19 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
       setHistoria('');
       setPortadaFile(null);
       setPortadaPreview(null);
-      setIntegrantes([{ nombre: '', instrumento: '', instagram_url: '', fotoFile: null }]);
-      setCanciones([{ titulo: '', spotify: '', youtube: '' }]);
+      setIntegrantes([crearItemVacioIntegrante()]);
+      setCanciones([crearItemVacioCancion()]);
 
       if (onExito) onExito();
 
     } catch (error: any) {
-      console.error(error);
-      
-      // Rollback si ocurre un fallo posterior a la creación de la banda
+      console.error('Error durante el registro:', error);
+
+      // Rollback manual de Storage y DB
+      if (fotosSubidas.length > 0) {
+        await supabase.storage.from('Bandas').remove(fotosSubidas);
+      }
+
       if (bandaIdInsertada) {
         await supabase.from('bandas').delete().eq('id', bandaIdInsertada);
       }
@@ -583,7 +605,7 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
           <h3 className="text-base font-bold uppercase tracking-wider text-white mb-4">👥 Integrantes</h3>
           <div className="space-y-4">
             {integrantes.map((integrante, index) => (
-              <div key={index} className="p-4 bg-background/40 border border-border rounded-xl space-y-3">
+              <div key={integrante.id} className="p-4 bg-background/40 border border-border rounded-xl space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                     Integrante #{index + 1}
@@ -660,7 +682,7 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
           <h3 className="text-base font-bold uppercase tracking-wider text-white mb-4">🎧 Canciones / Enlaces</h3>
           <div className="space-y-4">
             {canciones.map((cancion, index) => (
-              <div key={index} className="p-4 bg-background/40 border border-border rounded-xl space-y-3">
+              <div key={cancion.id} className="p-4 bg-background/40 border border-border rounded-xl space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                     Pista #{index + 1}
