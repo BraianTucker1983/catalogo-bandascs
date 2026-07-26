@@ -5,7 +5,6 @@ export interface Banda {
   id: string | number;
   nombre?: string | null;
   genero?: string | null;
-  historia?: string | null;
   foto_portada?: string | null;
   instagram_url?: string | null;
   tema_color?: string | null;
@@ -28,9 +27,10 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
         setCargando(true);
         setErrorMsg(null);
 
+        // Consulta optimizada ultraligera
         const { data, error } = await supabase
           .from('bandas')
-          .select('*')
+          .select('id, nombre, genero, foto_portada')
           .order('nombre', { ascending: true });
 
         if (error) {
@@ -85,7 +85,7 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase rounded-lg hover:opacity-90 transition-opacity"
+          className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
         >
           Reintentar
         </button>
@@ -117,7 +117,6 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
       {/* Grid de Tarjetas de Bandas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {bandas.map((banda, idx) => {
-          // Valores seguros defensivos
           const nombreBanda = banda.nombre || 'Sin nombre';
           const inicial = nombreBanda.charAt(0).toUpperCase();
           const tieneFoto = typeof banda.foto_portada === 'string' && banda.foto_portada.trim().length > 0;
@@ -127,14 +126,16 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
             <article
               key={keyUnica}
               onClick={() => handleSeleccionar(banda.id)}
-              className="group relative rounded-2xl border border-border/50 bg-card overflow-hidden hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer flex flex-col"
+              className="group relative rounded-2xl border border-border/50 bg-card overflow-hidden hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer flex flex-col justify-between"
             >
-              {/* Cabecera / Imagen de Portada */}
-              <div className="relative h-44 w-full bg-muted/40 overflow-hidden">
+              {/* Cabecera / Imagen de Portada (Limpia, sin superposiciones) */}
+              <div className="relative h-48 w-full bg-muted/40 overflow-hidden">
                 {tieneFoto ? (
                   <img
                     src={banda.foto_portada!}
                     alt={nombreBanda}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 ) : (
@@ -144,42 +145,29 @@ export default function ListaBandas({ onSeleccionarBanda }: ListaBandasProps) {
                     </span>
                   </div>
                 )}
-
-                {/* Tag de Género */}
-                {banda.genero && (
-                  <div className="absolute top-3 left-3">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white bg-black/60 backdrop-blur px-2.5 py-1 rounded-md border border-white/10">
-                      {banda.genero}
-                    </span>
-                  </div>
-                )}
               </div>
 
-              {/* Contenido de la Tarjeta */}
-              <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                <div>
+              {/* Contenido: Nombre, Género debajo y Acción */}
+              <div className="p-5 flex flex-col justify-between space-y-4">
+                <div className="space-y-1.5">
                   <h3 className="text-xl font-bold text-white group-hover:text-primary transition-colors line-clamp-1">
                     {nombreBanda}
                   </h3>
-                  {banda.historia && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-2 leading-relaxed">
-                      {banda.historia}
-                    </p>
+
+                  {/* Tag de Género ubicado debajo del nombre */}
+                  {banda.genero && (
+                    <div>
+                      <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2.5 py-0.5 rounded-md border border-border/40">
+                        {banda.genero}
+                      </span>
+                    </div>
                   )}
                 </div>
 
-                {/* Botón de Selección con Click Directo */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSeleccionar(banda.id);
-                  }}
-                  className="w-full pt-2 border-t border-border/30 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary hover:text-white transition-colors cursor-pointer"
-                >
+                <div className="pt-3 border-t border-border/30 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-primary group-hover:text-white transition-colors">
                   <span>Ver legajo completo</span>
                   <span className="group-hover:translate-x-1 transition-transform">→</span>
-                </button>
+                </div>
               </div>
             </article>
           );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import emailjs from '@emailjs/browser';
 import { supabase } from '../lib/supabaseClient';
 
@@ -25,7 +25,6 @@ const TEMAS_DISPONIBLES = [
   { id: 'lime', nombre: 'Verde Ácido', primary: '#84cc16', bgGlow: 'rgba(132, 204, 22, 0.25)' },
 ];
 
-/** Clean/Sanitize string for filenames */
 function sanitizarNombreArchivo(texto: string): string {
   return texto
     .normalize('NFD')
@@ -35,9 +34,6 @@ function sanitizarNombreArchivo(texto: string): string {
     .replace(/_+/g, '_');
 }
 
-/**
- * Convierte cualquier imagen (PNG, JPG, etc.) a WebP y la comprime en el navegador.
- */
 async function convertirAWebp(archivo: File, maxAncho = 1200, calidad = 0.8): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -46,7 +42,6 @@ async function convertirAWebp(archivo: File, maxAncho = 1200, calidad = 0.8): Pr
       const img = new Image();
       img.src = e.target?.result as string;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
 
@@ -55,6 +50,7 @@ async function convertirAWebp(archivo: File, maxAncho = 1200, calidad = 0.8): Pr
           width = maxAncho;
         }
 
+        const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
 
@@ -72,18 +68,15 @@ async function convertirAWebp(archivo: File, maxAncho = 1200, calidad = 0.8): Pr
           calidad
         );
       };
-      img.onerror = (err) => reject(err);
+      img.onerror = () => reject(new Error('Error al cargar la imagen local'));
     };
-    reader.onerror = (err) => reject(err);
+    reader.onerror = () => reject(new Error('Error al leer el archivo'));
   });
 }
 
-/**
- * Subir un Blob a Supabase Storage y retornar su URL pública
- */
 async function subirImagenSupabase(blob: Blob, rutaNombre: string): Promise<string> {
   const { data, error } = await supabase.storage
-    .from('bandas')
+    .from('Bandas')
     .upload(rutaNombre, blob, {
       contentType: 'image/webp',
       upsert: true,
@@ -92,7 +85,7 @@ async function subirImagenSupabase(blob: Blob, rutaNombre: string): Promise<stri
   if (error) throw error;
 
   const { data: urlData } = supabase.storage
-    .from('bandas')
+    .from('Bandas')
     .getPublicUrl(data.path);
 
   return urlData.publicUrl;
@@ -106,7 +99,6 @@ interface IntegranteEstado {
   fotoPreviewUrl?: string | null;
 }
 
-// 1. Declarar las props aceptadas por el componente
 interface FormularioBandaProps {
   onExito?: () => void;
   onCancelar?: () => void;
@@ -134,32 +126,46 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
 
   const [enviando, setEnviando] = useState(false);
 
-  // Limpiar URLs creadas con createObjectURL al desmontar
+  // Mantener referencias actualizadas de URLs Blob para limpiar en unmount sin leaks
+  const activeObjectUrls = useRef<Set<string>>(new Set());
+
+  const crearObjectUrl = (file: File): string => {
+    const url = URL.createObjectURL(file);
+    activeObjectUrls.current.add(url);
+    return url;
+  };
+
+  const revocarObjectUrl = (url?: string | null) => {
+    if (url && activeObjectUrls.current.has(url)) {
+      URL.revokeObjectURL(url);
+      activeObjectUrls.current.delete(url);
+    }
+  };
+
   useEffect(() => {
     return () => {
-      if (portadaPreview) URL.revokeObjectURL(portadaPreview);
-      integrantes.forEach((i) => {
-        if (i.fotoPreviewUrl) URL.revokeObjectURL(i.fotoPreviewUrl);
-      });
+      // Limpiar de forma segura todas las URLs generadas al desmontar el componente
+      activeObjectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+      activeObjectUrls.current.clear();
     };
   }, []);
 
   const temaActivo = TEMAS_DISPONIBLES.find((t) => t.id === temaColor) || TEMAS_DISPONIBLES[0];
 
   const manejarCambioGenero = (genero: string) => {
-    if (generosSeleccionados.includes(genero)) {
-      setGenerosSeleccionados(generosSeleccionados.filter(g => g !== genero));
-    } else {
-      setGenerosSeleccionados([...generosSeleccionados, genero]);
-    }
+    setGenerosSeleccionados((prev) =>
+      prev.includes(genero) ? prev.filter((g) => g !== genero) : [...prev, genero]
+    );
   };
 
   const manejarSeleccionPortada = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (portadaPreview) URL.revokeObjectURL(portadaPreview);
+      revocarObjectUrl(portadaPreview);
+      
+      const newPreviewUrl = crearObjectUrl(file);
       setPortadaFile(file);
-      setPortadaPreview(URL.createObjectURL(file));
+      setPortadaPreview(newPreviewUrl);
     }
   };
 
@@ -168,47 +174,50 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
     campo: K,
     valor: IntegranteEstado[K]
   ) => {
-    const nuevos = [...integrantes];
-    
-    if (campo === 'fotoFile' && valor instanceof File) {
-      if (nuevos[index].fotoPreviewUrl) {
-        URL.revokeObjectURL(nuevos[index].fotoPreviewUrl!);
-      }
-      nuevos[index].fotoPreviewUrl = URL.createObjectURL(valor);
-    }
+    setIntegrantes((prev) => {
+      const nuevos = [...prev];
+      const actual = { ...nuevos[index] };
 
-    nuevos[index] = { ...nuevos[index], [campo]: valor };
-    setIntegrantes(nuevos);
+      if (campo === 'fotoFile' && valor instanceof File) {
+        revocarObjectUrl(actual.fotoPreviewUrl);
+        actual.fotoPreviewUrl = crearObjectUrl(valor);
+      }
+
+      actual[campo] = valor;
+      nuevos[index] = actual;
+      return nuevos;
+    });
   };
 
   const agregarIntegrante = () => {
-    setIntegrantes([
-      ...integrantes,
+    setIntegrantes((prev) => [
+      ...prev,
       { nombre: '', instrumento: '', instagram_url: '', fotoFile: null }
     ]);
   };
 
   const eliminarIntegrante = (index: number) => {
     if (integrantes.length > 1) {
-      const aEliminar = integrantes[index];
-      if (aEliminar.fotoPreviewUrl) URL.revokeObjectURL(aEliminar.fotoPreviewUrl);
-      setIntegrantes(integrantes.filter((_, i) => i !== index));
+      revocarObjectUrl(integrantes[index].fotoPreviewUrl);
+      setIntegrantes((prev) => prev.filter((_, i) => i !== index));
     }
   };
 
   const cambiarCancion = (index: number, campo: 'titulo' | 'spotify' | 'youtube', valor: string) => {
-    const nuevas = [...canciones];
-    nuevas[index][campo] = valor;
-    setCanciones(nuevas);
+    setCanciones((prev) => {
+      const nuevas = [...prev];
+      nuevas[index] = { ...nuevas[index], [campo]: valor };
+      return nuevas;
+    });
   };
 
   const agregarCancion = () => {
-    setCanciones([...canciones, { titulo: '', spotify: '', youtube: '' }]);
+    setCanciones((prev) => [...prev, { titulo: '', spotify: '', youtube: '' }]);
   };
 
   const eliminarCancion = (index: number) => {
     if (canciones.length > 1) {
-      setCanciones(canciones.filter((_, i) => i !== index));
+      setCanciones((prev) => prev.filter((_, i) => i !== index));
     }
   };
 
@@ -221,7 +230,6 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
     }
 
     setEnviando(true);
-
     let bandaIdInsertada: string | null = null;
 
     try {
@@ -229,7 +237,7 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
       const timeStamp = Date.now();
       const slugNombre = sanitizarNombreArchivo(nombre);
 
-      // A. Portada
+      // 1. Portada
       let fotoPortadaUrl: string | null = null;
       if (portadaFile) {
         const webpBlob = await convertirAWebp(portadaFile, 1400, 0.85);
@@ -237,7 +245,7 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
         fotoPortadaUrl = await subirImagenSupabase(webpBlob, ruta);
       }
 
-      // 1. Inserción de la banda
+      // 2. Inserción de la banda
       const { data: bandaInsertada, error: errorBanda } = await supabase
         .from('bandas')
         .insert([
@@ -259,8 +267,8 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
       if (errorBanda) throw errorBanda;
       bandaIdInsertada = bandaInsertada.id;
 
-      // 2. Integrantes
-      const integrantesFiltrados = integrantes.filter(i => i.nombre.trim() !== '');
+      // 3. Integrantes
+      const integrantesFiltrados = integrantes.filter((i) => i.nombre.trim() !== '');
       if (integrantesFiltrados.length > 0) {
         const integrantesParaInsertar = await Promise.all(
           integrantesFiltrados.map(async (m) => {
@@ -290,10 +298,10 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
         if (errorIntegrantes) throw errorIntegrantes;
       }
 
-      // 3. Canciones
+      // 4. Canciones
       const cancionesFiltradas = canciones
-        .filter(c => c.titulo.trim() !== '')
-        .map(c => ({
+        .filter((c) => c.titulo.trim() !== '')
+        .map((c) => ({
           banda_id: bandaIdInsertada,
           titulo: c.titulo,
           spotify_embed_url: c.spotify || null,
@@ -308,26 +316,33 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
         if (errorCanciones) throw errorCanciones;
       }
 
-      // 4. Email
+      // 5. Envío de Email mediante Variables de Entorno (Recomendado)
       try {
+        const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_lth9njw';
+        const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_o83d6ph';
+        const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'se4gVL7DjUFdcuO9f';
+
         await emailjs.send(
-          'service_lth9njw',
-          'template_o83d6ph',
+          serviceId,
+          templateId,
           {
             nombre_banda: nombre,
             to_email: email,
             clave: palabraClave,
             genero: generoFinalString,
           },
-          'se4gVL7DjUFdcuO9f'
+          publicKey
         );
       } catch (errEmail) {
         console.error("Error al enviar email de confirmación:", errEmail);
       }
 
-      alert('¡Inscripción completada! Tu banda y las fotos comprimidas en WebP se subieron correctamente.');
+      alert('¡Inscripción completada! Tu banda se registró exitosamente.');
 
-      // Resetear estados
+      // Resetear estado
+      revocarObjectUrl(portadaPreview);
+      integrantes.forEach((i) => revocarObjectUrl(i.fotoPreviewUrl));
+
       setNombre('');
       setEmail('');
       setPalabraClave('');
@@ -336,25 +351,21 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
       setTemaColor('purple');
       setHistoria('');
       setPortadaFile(null);
-      if (portadaPreview) URL.revokeObjectURL(portadaPreview);
       setPortadaPreview(null);
       setIntegrantes([{ nombre: '', instrumento: '', instagram_url: '', fotoFile: null }]);
       setCanciones([{ titulo: '', spotify: '', youtube: '' }]);
 
-      // 2. Ejecutar el callback de exito si fue provisto
-      if (onExito) {
-        onExito();
-      }
+      if (onExito) onExito();
 
     } catch (error: any) {
-      console.error(error.message);
+      console.error(error);
       
-      // Rollback opcional en caso de fallo crítico en integrantes/canciones
+      // Rollback si ocurre un fallo posterior a la creación de la banda
       if (bandaIdInsertada) {
         await supabase.from('bandas').delete().eq('id', bandaIdInsertada);
       }
 
-      alert(`Hubo un error al guardar: ${error.message}`);
+      alert(`Hubo un error al guardar: ${error.message || error}`);
     } finally {
       setEnviando(false);
     }
@@ -366,7 +377,6 @@ export default function FormularioBanda({ onExito, onCancelar }: FormularioBanda
   return (
     <div className="max-w-3xl mx-auto my-12 bg-card border border-border p-8 rounded-2xl shadow-2xl relative text-foreground">
       
-      {/* Botón opcional de cerrar/cancelar si la prop onCancelar existe */}
       {onCancelar && (
         <button
           type="button"

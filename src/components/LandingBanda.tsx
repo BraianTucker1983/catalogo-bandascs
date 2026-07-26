@@ -46,11 +46,6 @@ interface LandingBandaProps {
 
 /**
  * Normaliza URLs de YouTube a formato iframe embed.
- * Soporta:
- * - https://www.youtube.com/watch?v=VIDEO_ID
- * - https://youtu.be/VIDEO_ID
- * - https://www.youtube.com/shorts/VIDEO_ID
- * - https://www.youtube.com/embed/VIDEO_ID
  */
 function parseYoutubeEmbed(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
@@ -65,7 +60,6 @@ function parseYoutubeEmbed(url?: string | null): string | null {
 
 /**
  * Normaliza URLs de Spotify a formato iframe embed.
- * Convierte open.spotify.com/track/ID -> open.spotify.com/embed/track/ID
  */
 function parseSpotifyEmbed(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
@@ -91,41 +85,51 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
         setCargando(true);
         setErrorCarga(null);
 
-        // Intento 1: Consulta completa con relaciones
-        const { data, error } = await supabase
+        // 1. Obtener la información general de la banda
+        const { data: bandaData, error: bandaError } = await supabase
           .from('bandas')
-          .select(`
-            id,
-            nombre,
-            genero,
-            historia,
-            foto_portada,
-            instagram_url,
-            spotify_artist_url,
-            tema_color,
-            integrantes(id, nombre, instrumento),
-            canciones(id, titulo, spotify_embed_url, youtube_embed_url)
-          `)
+          .select('*')
           .eq('id', bandaId)
           .maybeSingle();
 
-        if (error) {
-          console.warn('Error en la consulta relacional de Supabase:', error.message);
-          // Fallback a consulta simple si la relación falla por RLS o falta de FK
-          const { data: dataSimple, error: errorSimple } = await supabase
-            .from('bandas')
-            .select('*')
-            .eq('id', bandaId)
-            .maybeSingle();
+        if (bandaError) throw bandaError;
 
-          if (errorSimple) throw errorSimple;
-          if (!cancelado) setBanda(dataSimple as BandaDetalle);
-        } else if (!cancelado) {
-          setBanda(data as BandaDetalle);
+        if (!bandaData) {
+          if (!cancelado) setBanda(null);
+          return;
+        }
+
+        // 2. Traer integrantes y canciones en paralelo
+        const [integrantesRes, cancionesRes] = await Promise.all([
+          supabase
+            .from('integrantes')
+            .select('id, nombre, instrumento')
+            .eq('banda_id', bandaId),
+          supabase
+            .from('canciones')
+            .select('id, titulo, spotify_embed_url, youtube_embed_url')
+            .eq('banda_id', bandaId),
+        ]);
+
+        if (integrantesRes.error) {
+          console.warn('Error al cargar integrantes:', integrantesRes.error.message);
+        }
+
+        if (cancionesRes.error) {
+          console.warn('Error al cargar canciones:', cancionesRes.error.message);
+        }
+
+        if (!cancelado) {
+          setBanda({
+            ...bandaData,
+            integrantes: integrantesRes.data || [],
+            canciones: cancionesRes.data || [],
+          });
         }
       } catch (err: unknown) {
         if (!cancelado) {
-          const mensaje = err instanceof Error ? err.message : 'Error desconocido al cargar la banda.';
+          const mensaje =
+            err instanceof Error ? err.message : 'Error desconocido al cargar la banda.';
           console.error('Error al cargar la landing de la banda:', mensaje);
           setErrorCarga(mensaje);
         }
@@ -167,7 +171,9 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
       <div className="max-w-2xl mx-auto px-4 py-20 text-center space-y-6">
         <div className="p-8 rounded-2xl border border-destructive/30 bg-destructive/10">
           <p className="text-destructive font-medium text-sm">
-            {errorCarga ? 'No se pudo cargar la información de la banda.' : 'No se encontró la banda seleccionada.'}
+            {errorCarga
+              ? 'No se pudo cargar la información de la banda.'
+              : 'No se encontró la banda seleccionada.'}
           </p>
         </div>
         <button
@@ -190,7 +196,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
       />
 
       <div className="max-w-4xl mx-auto px-4 pt-8 relative z-10 space-y-10">
-        
         {/* Botón Volver */}
         <div>
           <button
@@ -356,7 +361,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
             </div>
           </section>
         )}
-
       </div>
     </div>
   );
