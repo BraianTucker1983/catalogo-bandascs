@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 
 // Importación de componentes principales
-import Header from './components/Header'; // 👈 IMPORTANTE: Importamos el Header
+import Header from './components/Header';
 import ListaBandas from './components/ListaBandas';
 import LandingBanda from './components/LandingBanda'; 
 import FormularioBanda from './components/FormularioBanda'; 
+import EditarBanda from './components/EditarBanda'; // 👈 1. Importado
 import AdminPanel from './components/PanelAdmin'; 
 import Footer from './components/Footer';
 
@@ -90,10 +91,10 @@ export default function App() {
       {/* Glow de fondo decorativo */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-primary/10 blur-[120px] pointer-events-none rounded-full" />
 
-      {/* 🚀 HEADER INTEGRADO */}
+      {/* HEADER INTEGRADO */}
       <Header onNavegar={handleNavegar} vistaActual={vista} />
 
-      {/* Barra de estado rápido/Debug (Opcional) */}
+      {/* Barra de estado rápido/Debug */}
       <div className="w-full max-w-6xl mx-auto px-6 pt-3 flex justify-end">
         <button
           type="button"
@@ -151,21 +152,9 @@ export default function App() {
           />
         )}
 
-        {/* Vista 4: Solicitud de Edición */}
+        {/* Vista 4: Edición de Perfil con Clave Secreta */}
         {vista === 'editar' && (
-          <div className="max-w-2xl mx-auto text-center py-12 space-y-4">
-            <h2 className="text-2xl font-bold">Solicitar modificación de datos</h2>
-            <p className="text-sm text-muted-foreground">
-              Para actualizar la biografía, integrantes o material multimedia de tu banda, ponete en contacto con el equipo de administración.
-            </p>
-            <button
-              type="button"
-              onClick={() => handleNavegar('catalogo')}
-              className="px-4 py-2 bg-card border border-border rounded-xl text-xs font-bold uppercase tracking-wider hover:border-primary transition-colors cursor-pointer"
-            >
-              ← Volver al catálogo
-            </button>
-          </div>
+          <EditarBanda /> // 👈 2. Componente real montado
         )}
 
         {/* Vista 5: Panel de Administración */}

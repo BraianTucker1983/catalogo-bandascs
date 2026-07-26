@@ -32,7 +32,7 @@ export default function EditarBanda() {
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
 
-  // Detección automática de token en la URL
+  // Detección automática de token en la URL si acceden por link
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenUrl = urlParams.get('token');
@@ -43,7 +43,8 @@ export default function EditarBanda() {
   }, []);
 
   const cargarDatosBanda = async (token: string) => {
-    const tokenLimpio = token.trim();
+    // 1. Limpiamos espacios y pasamos a minúsculas
+    const tokenLimpio = token.trim().toLowerCase();
 
     if (!tokenLimpio) {
       setMensaje({ tipo: 'error', texto: 'Por favor, introduce un código secreto válido.' });
@@ -54,11 +55,11 @@ export default function EditarBanda() {
     setMensaje(null);
 
     try {
-      // 1. Validar y obtener datos de la banda principal por clave_edicion
+      // 🔒 Buscamos apuntando a la columna exacta: 'palabra_clave'
       const { data: bandaData, error: bandaError } = await supabase
         .from('bandas')
-        .select('id, nombre, genero, historia')
-        .eq('clave_edicion', tokenLimpio)
+        .select('id, nombre, genero, historia, palabra_clave')
+        .eq('palabra_clave', tokenLimpio)
         .maybeSingle();
 
       if (bandaError) throw bandaError;
@@ -72,7 +73,7 @@ export default function EditarBanda() {
         return;
       }
 
-      // 2. Traer integrantes y canciones en paralelo (evita fallos de join en PostgREST)
+      // 2. Cargar integrantes y canciones de la banda encontrada...
       const [integrantesRes, cancionesRes] = await Promise.all([
         supabase
           .from('integrantes')
@@ -137,10 +138,16 @@ export default function EditarBanda() {
         .update({ nombre, genero, historia })
         .eq('id', bandaId);
 
-      if (errorBanda) throw errorBanda;
+      if (errorBanda) throw new Error(`Banda: ${errorBanda.message}`);
 
-      // B. Reemplazar integrantes
-      await supabase.from('integrantes').delete().eq('banda_id', bandaId);
+      // B. Sincronizar integrantes (DELETE anterior + INSERT nuevos)
+      const { error: errDelInt } = await supabase
+        .from('integrantes')
+        .delete()
+        .eq('banda_id', bandaId);
+        
+      if (errDelInt) throw new Error(`Eliminar integrantes: ${errDelInt.message}`);
+
       const nuevosIntegrantes = integrantes
         .filter((i) => i.nombre.trim() !== '')
         .map((i) => ({
@@ -153,11 +160,17 @@ export default function EditarBanda() {
         const { error: errorInt } = await supabase
           .from('integrantes')
           .insert(nuevosIntegrantes);
-        if (errorInt) throw errorInt;
+        if (errorInt) throw new Error(`Insertar integrantes: ${errorInt.message}`);
       }
 
-      // C. Reemplazar canciones
-      await supabase.from('canciones').delete().eq('banda_id', bandaId);
+      // C. Sincronizar canciones
+      const { error: errDelCanc } = await supabase
+        .from('canciones')
+        .delete()
+        .eq('banda_id', bandaId);
+
+      if (errDelCanc) throw new Error(`Eliminar canciones: ${errDelCanc.message}`);
+
       const nuevasCanciones = canciones
         .filter((c) => c.titulo.trim() !== '')
         .map((c) => ({
@@ -171,19 +184,18 @@ export default function EditarBanda() {
         const { error: errorCanc } = await supabase
           .from('canciones')
           .insert(nuevasCanciones);
-        if (errorCanc) throw errorCanc;
+        if (errorCanc) throw new Error(`Insertar canciones: ${errorCanc.message}`);
       }
 
       setMensaje({ tipo: 'exito', texto: '¡Tu perfil musical ha sido actualizado con éxito!' });
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : 'Error al guardar cambios.';
-      setMensaje({ tipo: 'error', texto: `Error al guardar: ${errorMsg}` });
+      setMensaje({ tipo: 'error', texto: errorMsg });
     } finally {
       setCargando(false);
     }
   };
 
-  // Funciones inmutables para manipular listas de estado
   const actualizarIntegrante = (index: number, campo: keyof IntegranteInput, valor: string) => {
     setIntegrantes((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [campo]: valor } : item))
@@ -204,7 +216,7 @@ export default function EditarBanda() {
     setCanciones((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Vista cuando aún no se autentica
+  // Vista 1: Formulario de Login / Verificación de Palabra Clave
   if (!autenticado) {
     return (
       <div
@@ -220,7 +232,7 @@ export default function EditarBanda() {
       >
         <h3 style={{ marginTop: 0 }}>🔑 Modificar mi Banda</h3>
         <p style={{ fontSize: '14px', color: '#666' }}>
-          Introduce el código secreto o accede mediante el link que se te dio al registrar la banda.
+          Introduce tu palabra clave secreta enviada por correo para editar tu información.
         </p>
 
         <form
@@ -231,7 +243,7 @@ export default function EditarBanda() {
         >
           <input
             type="text"
-            placeholder="Pegar código secreto aquí..."
+            placeholder="Ingresa tu palabra clave (ej: metallica)..."
             value={tokenInput}
             onChange={(e) => setTokenInput(e.target.value)}
             style={{
@@ -276,7 +288,7 @@ export default function EditarBanda() {
     );
   }
 
-  // Vista con el formulario activo
+  // Vista 2: Edición del Perfil habilitado
   return (
     <div
       style={{
@@ -354,7 +366,7 @@ export default function EditarBanda() {
           />
         </div>
 
-        {/* Integrantes */}
+        {/* Sección Integrantes */}
         <div style={{ marginBottom: '1.5rem', padding: '10px', border: '1px solid #ddd' }}>
           <h4 style={{ marginTop: 0 }}>Integrantes actuales</h4>
           {integrantes.map((int, i) => (
@@ -393,16 +405,14 @@ export default function EditarBanda() {
           ))}
           <button
             type="button"
-            onClick={() =>
-              setIntegrantes([...integrantes, { nombre: '', instrumento: '' }])
-            }
+            onClick={() => setIntegrantes([...integrantes, { nombre: '', instrumento: '' }])}
             style={{ marginTop: '5px', cursor: 'pointer' }}
           >
             + Añadir Integrante
           </button>
         </div>
 
-        {/* Multimedia */}
+        {/* Sección Multimedia */}
         <div
           style={{
             marginBottom: '1.5rem',
@@ -418,7 +428,7 @@ export default function EditarBanda() {
               style={{
                 marginBottom: '12px',
                 paddingBottom: '8px',
-                borderBottom: '1px border #cce2d3',
+                borderBottom: '1px solid #cce2d3',
               }}
             >
               <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
