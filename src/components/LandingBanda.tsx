@@ -209,17 +209,50 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
 
         {/* Encabezado Principal / Hero */}
         <header className="text-center space-y-6 pt-2">
-          {/* Imagen de portada / Banner opcional */}
-          {banda.foto_portada && (
-            <div className="w-full h-64 md:h-80 rounded-2xl overflow-hidden border border-border/60 shadow-2xl relative bg-card">
-              <img
-                src={banda.foto_portada}
-                alt={banda.nombre}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80" />
-            </div>
-          )}
+          {/* Encabezado Principal / Hero */}
+<header className="text-center space-y-6 pt-2">
+  {/* Imagen de portada / Logo adaptable en proporción nativa */}
+  {banda.foto_portada && (
+    <div className="w-full rounded-2xl overflow-hidden border border-border/60 shadow-2xl relative bg-slate-950/80 p-3 md:p-6 flex items-center justify-center">
+      {/* Fondo ambiental suave */}
+      <img
+        src={banda.foto_portada}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none scale-125"
+      />
+
+      {/* Imagen principal: usa w-full h-auto nativo para NO cortar bordes superiores ni inferiores */}
+      <img
+        src={banda.foto_portada}
+        alt={banda.nombre}
+        className="relative z-10 w-full max-w-2xl h-auto object-contain rounded-xl drop-shadow-2xl"
+      />
+    </div>
+  )}
+
+  <div className="space-y-3">
+    {banda.genero && (
+      <div>
+        <span
+          className="inline-block text-[11px] font-black uppercase tracking-widest px-3.5 py-1 rounded-full border border-border bg-card/80 backdrop-blur-md shadow-sm"
+          style={{ color: temaActivo.primary, borderColor: `${temaActivo.primary}40` }}
+        >
+          {banda.genero}
+        </span>
+      </div>
+    )}
+
+    <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight text-white drop-shadow-md">
+      {banda.nombre}
+    </h1>
+
+    <div
+      className="w-24 h-1 mx-auto rounded-full"
+      style={{ backgroundColor: temaActivo.primary }}
+    />
+  </div>
+</header>
 
           <div className="space-y-3">
             {banda.genero && (
