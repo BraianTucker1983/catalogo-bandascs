@@ -23,7 +23,7 @@ export interface BandaResumen {
 
 interface CatalogoBandasProps {
   onSeleccionarBanda: (id: string) => void;
-  onNuevaBanda: () => void;
+  onNuevaBanda?: () => void;
 }
 
 export default function CatalogoBandas({
@@ -91,34 +91,36 @@ export default function CatalogoBandas({
       </div>
 
       {/* Barra de Búsqueda y Filtros */}
-      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-        <input
-          type="text"
-          placeholder="Buscar por nombre o género..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full md:w-80 bg-card/60 border border-border/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
-        />
+<div className="flex flex-col md:flex-row gap-4 items-stretch md:items-start justify-between">
+  <input
+    type="text"
+    placeholder="Buscar por nombre o género..."
+    value={busqueda}
+    onChange={(e) => setBusqueda(e.target.value)}
+    className="w-full md:w-80 bg-card/60 border border-border/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors shrink-0"
+  />
 
-        {generosDisponibles.length > 1 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
-            {generosDisponibles.map((gen) => (
-              <button
-                key={gen}
-                type="button"
-                onClick={() => setGeneroFiltro(gen)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer whitespace-nowrap ${
-                  generoFiltro === gen
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-card/60 border border-border/80 text-muted-foreground hover:text-white'
-                }`}
-              >
-                {gen}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+  {generosDisponibles.length > 1 && (
+    /* Cambiamos 'overflow-x-auto' por 'flex-wrap' y removemos scrollbar */
+    <div className="flex flex-wrap items-center gap-2">
+      {generosDisponibles.map((gen) => (
+        <button
+          key={gen}
+          type="button"
+          onClick={() => setGeneroFiltro(gen)}
+          /* Eliminamos 'whitespace-nowrap' */
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+            generoFiltro === gen
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-card/60 border border-border/80 text-muted-foreground hover:text-white'
+          }`}
+        >
+          {gen}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
 
       {/* Listado / Grid */}
       {cargando ? (

@@ -5,7 +5,7 @@ import { supabase } from './lib/supabaseClient';
 import Header from './components/Header';
 import ListaBandas from './components/ListaBandas';
 import LandingBanda from './components/LandingBanda'; 
-import FormularioBanda from './components/FormularioBanda'; 
+import { FormBanda } from "./components/FormularioBanda"; 
 import EditarBanda from './components/EditarBanda';
 import AdminPanel from './components/PanelAdmin'; 
 import Footer from './components/Footer';
@@ -147,9 +147,9 @@ export default function App() {
 
         {/* Vista 3: Formulario de Postulación de Banda */}
         {vista === 'formulario' && (
-          <FormularioBanda 
-            onExito={() => handleNavegar('catalogo')}
-            onCancelar={() => handleNavegar('catalogo')}
+          <FormBanda 
+            onSuccess={() => handleNavegar('catalogo')}
+            onCancel={() => handleNavegar('catalogo')}
           />
         )}
 
