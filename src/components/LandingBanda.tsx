@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 // Mapa de colores basado en las opciones del formulario
@@ -9,7 +9,7 @@ const TEMAS_MAPA: Record<string, { primary: string; bgGlow: string }> = {
   cyan: { primary: '#06b6d4', bgGlow: 'rgba(6, 182, 212, 0.25)' },
   rose: { primary: '#f43f5e', bgGlow: 'rgba(244, 63, 94, 0.25)' },
   indigo: { primary: '#6366f1', bgGlow: 'rgba(99, 102, 241, 0.25)' },
-  crimson: { primary: '#efde44', bgGlow: 'rgba(239, 222, 68, 0.25)' },
+  crimson: { primary: '#dc2626', bgGlow: 'rgba(220, 38, 38, 0.25)' },
   lime: { primary: '#84cc16', bgGlow: 'rgba(132, 204, 22, 0.25)' },
 };
 
@@ -17,6 +17,8 @@ interface Integrante {
   id: string | number;
   nombre: string;
   instrumento?: string | null;
+  foto?: string | null;
+  instagram?: string | null;
 }
 
 interface Cancion {
@@ -44,9 +46,6 @@ interface LandingBandaProps {
   onVolver: () => void;
 }
 
-/**
- * Normaliza URLs de YouTube a formato iframe embed.
- */
 function parseYoutubeEmbed(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
   const urlLimpia = url.trim();
@@ -58,9 +57,6 @@ function parseYoutubeEmbed(url?: string | null): string | null {
   return match ? `https://www.youtube.com/embed/${match[1]}` : null;
 }
 
-/**
- * Normaliza URLs de Spotify a formato iframe embed.
- */
 function parseSpotifyEmbed(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
   const urlLimpia = url.trim();
@@ -77,6 +73,8 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     let cancelado = false;
 
@@ -85,7 +83,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
         setCargando(true);
         setErrorCarga(null);
 
-        // 1. Obtener la información general de la banda
         const { data: bandaData, error: bandaError } = await supabase
           .from('bandas')
           .select('*')
@@ -99,11 +96,10 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           return;
         }
 
-        // 2. Traer integrantes y canciones en paralelo
         const [integrantesRes, cancionesRes] = await Promise.all([
           supabase
             .from('integrantes')
-            .select('id, nombre, instrumento')
+            .select('id, nombre, instrumento, foto, instagram')
             .eq('banda_id', bandaId),
           supabase
             .from('canciones')
@@ -149,11 +145,22 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
     };
   }, [bandaId]);
 
-  // Selección del tema visual
   const temaActivo = useMemo(() => {
     const claveTema = banda?.tema_color?.toLowerCase() || 'purple';
     return TEMAS_MAPA[claveTema] || TEMAS_MAPA.purple;
   }, [banda?.tema_color]);
+
+  const scrollLeft = () => {
+    if (carouselRef.current) {
+      carouselRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRight = () => {
+    if (carouselRef.current) {
+      carouselRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+    }
+  };
 
   if (cargando) {
     return (
@@ -187,6 +194,8 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
     );
   }
 
+  const esIntegranteUnico = banda.integrantes?.length === 1;
+
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden pb-24">
       {/* Resplandor temático dinámico de fondo */}
@@ -209,50 +218,21 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
 
         {/* Encabezado Principal / Hero */}
         <header className="text-center space-y-6 pt-2">
-          {/* Encabezado Principal / Hero */}
-<header className="text-center space-y-6 pt-2">
-  {/* Imagen de portada / Logo adaptable en proporción nativa */}
-  {banda.foto_portada && (
-    <div className="w-full rounded-2xl overflow-hidden border border-border/60 shadow-2xl relative bg-slate-950/80 p-3 md:p-6 flex items-center justify-center">
-      {/* Fondo ambiental suave */}
-      <img
-        src={banda.foto_portada}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none scale-125"
-      />
-
-      {/* Imagen principal: usa w-full h-auto nativo para NO cortar bordes superiores ni inferiores */}
-      <img
-        src={banda.foto_portada}
-        alt={banda.nombre}
-        className="relative z-10 w-full max-w-2xl h-auto object-contain rounded-xl drop-shadow-2xl"
-      />
-    </div>
-  )}
-
-  <div className="space-y-3">
-    {banda.genero && (
-      <div>
-        <span
-          className="inline-block text-[11px] font-black uppercase tracking-widest px-3.5 py-1 rounded-full border border-border bg-card/80 backdrop-blur-md shadow-sm"
-          style={{ color: temaActivo.primary, borderColor: `${temaActivo.primary}40` }}
-        >
-          {banda.genero}
-        </span>
-      </div>
-    )}
-
-    <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight text-white drop-shadow-md">
-      {banda.nombre}
-    </h1>
-
-    <div
-      className="w-24 h-1 mx-auto rounded-full"
-      style={{ backgroundColor: temaActivo.primary }}
-    />
-  </div>
-</header>
+          {banda.foto_portada && (
+            <div className="w-full rounded-2xl overflow-hidden border border-border/60 shadow-2xl relative bg-slate-950/80 p-3 md:p-6 flex items-center justify-center">
+              <img
+                src={banda.foto_portada}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none scale-125"
+              />
+              <img
+                src={banda.foto_portada}
+                alt={banda.nombre}
+                className="relative z-10 w-full max-w-2xl h-auto object-contain rounded-xl drop-shadow-2xl"
+              />
+            </div>
+          )}
 
           <div className="space-y-3">
             {banda.genero && (
@@ -276,7 +256,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
             />
           </div>
 
-          {/* Enlaces Oficiales (Instagram / Spotify) */}
           {(banda.instagram_url || banda.spotify_artist_url) && (
             <div className="flex items-center justify-center gap-3 pt-2">
               {banda.instagram_url && (
@@ -315,24 +294,99 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           </section>
         )}
 
-        {/* Integrantes */}
+        {/* Formación / Integrantes */}
         {banda.integrantes && banda.integrantes.length > 0 && (
           <section className="space-y-4">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground pl-1 flex items-center gap-2">
-              <span style={{ color: temaActivo.primary }}>///</span> Formación / Integrantes
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {banda.integrantes.map((miembro) => (
-                <div
-                  key={miembro.id}
-                  className="bg-card/40 border border-border/80 p-4 rounded-xl backdrop-blur-sm hover:border-border/100 transition-colors"
-                >
-                  <p className="font-bold text-white text-sm">{miembro.nombre}</p>
-                  {miembro.instrumento && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{miembro.instrumento}</p>
-                  )}
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <span style={{ color: temaActivo.primary }}>///</span> Formación / Integrantes
+              </h2>
+
+              {/* Controles visibles solo si hay más de 1 integrante */}
+              {banda.integrantes.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={scrollLeft}
+                    aria-label="Anterior integrante"
+                    className="p-2 rounded-xl bg-card border border-border hover:border-primary/60 text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    onClick={scrollRight}
+                    aria-label="Siguiente integrante"
+                    className="p-2 rounded-xl bg-card border border-border hover:border-primary/60 text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                  >
+                    →
+                  </button>
                 </div>
-              ))}
+              )}
+            </div>
+
+            {/* Contenedor adaptativo: centrado para 1 integrante, scrollbar para múltiples */}
+            <div
+              ref={carouselRef}
+              className={`flex gap-4 py-2 px-0.5 ${
+                esIntegranteUnico
+                  ? 'justify-center'
+                  : 'overflow-x-auto snap-x snap-mandatory'
+              }`}
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {banda.integrantes.map((miembro) => {
+                const fotoSrc =
+                  miembro.foto ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    miembro.nombre
+                  )}&background=1e293b&color=fff&size=400`;
+
+                return (
+                  <div
+                    key={miembro.id}
+                    className={`snap-start shrink-0 bg-card/40 border border-border/80 rounded-2xl overflow-hidden backdrop-blur-sm p-4 space-y-3 hover:border-border/100 transition-colors shadow-md flex flex-col justify-between ${
+                      esIntegranteUnico
+                        ? 'w-full max-w-sm sm:max-w-md'
+                        : 'w-64 sm:w-72'
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div
+                        className={`w-full rounded-xl overflow-hidden bg-slate-900 border border-border/40 ${
+                          esIntegranteUnico ? 'h-64 sm:h-72' : 'h-48'
+                        }`}
+                      >
+                        <img
+                          src={fotoSrc}
+                          alt={miembro.nombre}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white text-base md:text-lg">{miembro.nombre}</p>
+                        {miembro.instrumento && (
+                          <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                            {miembro.instrumento}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {miembro.instagram && (
+                      <a
+                        href={miembro.instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold hover:underline inline-flex items-center gap-1 transition-colors pt-1"
+                        style={{ color: temaActivo.primary }}
+                      >
+                        Instagram ↗
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}
@@ -357,7 +411,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                   >
                     <h3 className="font-bold text-lg text-white">{cancion.titulo}</h3>
 
-                    {/* Embed de Spotify */}
                     {spotifyUrl && (
                       <div className="rounded-xl overflow-hidden shadow-md bg-black/30">
                         <iframe
@@ -372,7 +425,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                       </div>
                     )}
 
-                    {/* Embed de YouTube */}
                     {youtubeUrl && (
                       <div className="rounded-xl overflow-hidden aspect-video w-full shadow-md bg-black">
                         <iframe
