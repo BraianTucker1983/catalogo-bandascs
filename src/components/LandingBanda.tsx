@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 // Mapa de colores basado en las opciones del formulario
@@ -73,8 +73,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
-  const carouselRef = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
     let cancelado = false;
 
@@ -99,11 +97,11 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
         const [integrantesRes, cancionesRes] = await Promise.all([
           supabase
             .from('integrantes')
-            .select('id, nombre, instrumento, foto, instagram')
+            .select('*')
             .eq('banda_id', bandaId),
           supabase
             .from('canciones')
-            .select('id, titulo, spotify_embed_url, youtube_embed_url')
+            .select('*')
             .eq('banda_id', bandaId),
         ]);
 
@@ -150,18 +148,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
     return TEMAS_MAPA[claveTema] || TEMAS_MAPA.purple;
   }, [banda?.tema_color]);
 
-  const scrollLeft = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: -300, behavior: 'smooth' });
-    }
-  };
-
-  const scrollRight = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-    }
-  };
-
   if (cargando) {
     return (
       <div className="min-h-[450px] flex flex-col justify-center items-center space-y-4">
@@ -193,8 +179,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
       </div>
     );
   }
-
-  const esIntegranteUnico = banda.integrantes?.length === 1;
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden pb-24">
@@ -294,69 +278,29 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           </section>
         )}
 
-        {/* Formación / Integrantes */}
+        {/* Formación / Integrantes en Grid Responsivo */}
         {banda.integrantes && banda.integrantes.length > 0 && (
           <section className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <span style={{ color: temaActivo.primary }}>///</span> Formación / Integrantes
-              </h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1 flex items-center gap-2">
+              <span style={{ color: temaActivo.primary }}>///</span> Formación / Integrantes
+            </h2>
 
-              {/* Controles visibles solo si hay más de 1 integrante */}
-              {banda.integrantes.length > 1 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={scrollLeft}
-                    aria-label="Anterior integrante"
-                    className="p-2 rounded-xl bg-card border border-border hover:border-primary/60 text-muted-foreground hover:text-white transition-colors cursor-pointer"
-                  >
-                    ←
-                  </button>
-                  <button
-                    type="button"
-                    onClick={scrollRight}
-                    aria-label="Siguiente integrante"
-                    className="p-2 rounded-xl bg-card border border-border hover:border-primary/60 text-muted-foreground hover:text-white transition-colors cursor-pointer"
-                  >
-                    →
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Contenedor adaptativo: centrado para 1 integrante, scrollbar para múltiples */}
-            <div
-              ref={carouselRef}
-              className={`flex gap-4 py-2 px-0.5 ${
-                esIntegranteUnico
-                  ? 'justify-center'
-                  : 'overflow-x-auto snap-x snap-mandatory'
-              }`}
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
+            {/* Grid de 1 columna en mobile, 2 en sm, 3 en md */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {banda.integrantes.map((miembro) => {
                 const fotoSrc =
                   miembro.foto ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                    miembro.nombre
+                    miembro.nombre || 'Integrante'
                   )}&background=1e293b&color=fff&size=400`;
 
                 return (
                   <div
                     key={miembro.id}
-                    className={`snap-start shrink-0 bg-card/40 border border-border/80 rounded-2xl overflow-hidden backdrop-blur-sm p-4 space-y-3 hover:border-border/100 transition-colors shadow-md flex flex-col justify-between ${
-                      esIntegranteUnico
-                        ? 'w-full max-w-sm sm:max-w-md'
-                        : 'w-64 sm:w-72'
-                    }`}
+                    className="bg-card/40 border border-border/80 rounded-2xl overflow-hidden backdrop-blur-sm p-4 space-y-3 hover:border-border/100 transition-colors shadow-md flex flex-col justify-between"
                   >
                     <div className="space-y-3">
-                      <div
-                        className={`w-full rounded-xl overflow-hidden bg-slate-900 border border-border/40 ${
-                          esIntegranteUnico ? 'h-64 sm:h-72' : 'h-48'
-                        }`}
-                      >
+                      <div className="w-full h-48 sm:h-52 rounded-xl overflow-hidden bg-slate-900 border border-border/40">
                         <img
                           src={fotoSrc}
                           alt={miembro.nombre}

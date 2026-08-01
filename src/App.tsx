@@ -95,18 +95,7 @@ export default function App() {
       {/* HEADER INTEGRADO */}
       <Header onNavegar={handleNavegar} vistaActual={vista} />
 
-      {/* Barra de estado rápido/Debug */}
-      <div className="w-full max-w-6xl mx-auto px-6 pt-3 flex justify-end">
-        <button
-          type="button"
-          onClick={() => setMostrarDebug(!mostrarDebug)}
-          className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-0.5 rounded border border-border/30 bg-card/40 cursor-pointer"
-          title="Alternar estado de conexión"
-        >
-          {testError ? '🔴 Error DB' : `🟢 DB: ${testCount ?? '...'}`}
-        </button>
-      </div>
-
+      
       {/* Panel de Diagnóstico Colapsable */}
       {mostrarDebug && (
         <div className="bg-yellow-500/10 border-b border-yellow-500/20 py-2 px-6 text-xs font-mono text-yellow-300/90 flex items-center justify-between max-w-6xl mx-auto w-full z-30 my-2">
@@ -166,10 +155,14 @@ export default function App() {
       </main>
 
       {/* Pie de Página */}
-      <Footer 
+      <Footer
         isAdmin={isAdmin}
         onLogout={handleLogout}
         onNavegar={handleNavegar}
+        mostrarDebug={mostrarDebug}
+        setMostrarDebug={setMostrarDebug}
+        testError={testError}
+        testCount={testCount}
       />
 
     </div>

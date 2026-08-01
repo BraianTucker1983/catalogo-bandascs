@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X, Edit3, PlusCircle, Disc } from 'lucide-react';
+import { Menu, X, Edit3, Disc } from 'lucide-react';
 
 interface HeaderProps {
   onNavegar: (destino: 'formulario' | 'editar' | 'admin' | 'catalogo') => void;
@@ -22,32 +22,40 @@ export default function Header({ onNavegar, vistaActual }: HeaderProps) {
         <button 
           type="button"
           onClick={() => handleNavegacionMobile('catalogo')}
-          className="flex items-center gap-2 group cursor-pointer text-left focus:outline-none"
+          className="flex items-center gap-3 group cursor-pointer text-left focus:outline-none"
         >
-          <span className="text-xl font-black uppercase tracking-wider text-white group-hover:text-slate-200 transition-colors">
-            Catálogo de <span className="text-primary group-hover:brightness-110">Bandas</span>
-          </span>
+          {/* Renderizado de tu logo de Canva */}
+          <img 
+            src="./public/logo.png" 
+            alt="Catálogo de Bandas" 
+            className="h-16 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
+          />          
         </button>
 
         {/* --- NAVEGACIÓN EN PANTALLAS GRANDES (md en adelante) --- */}
-        <nav className="hidden md:flex items-center gap-4">
+        <nav className="hidden md:flex items-center gap-3">
           
+          {/* Botón 1: Modificar Datos (Misma estética con degradado) */}
           <button
             type="button"
             onClick={() => onNavegar('editar')}
-            className={`text-xs font-medium transition-colors cursor-pointer px-2 py-1 ${
-              vistaActual === 'editar'
-                ? 'text-white border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-white'
+            className={`relative p-[1.5px] rounded-full bg-gradient-to-r from-primary via-emerald-400 to-primary transition-all hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-primary/20 cursor-pointer ${
+              vistaActual === 'editar' ? 'ring-2 ring-emerald-400/50' : ''
             }`}
           >
-            Modificar datos
+            <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
+              <Edit3 className="w-3.5 h-3.5 text-primary" />
+              <span>Modificar Datos</span>
+            </div>
           </button>
 
+          {/* Botón 2: Inscribir Banda */}
           <button
             type="button"
             onClick={() => onNavegar('formulario')}
-            className="relative p-[1.5px] rounded-full bg-gradient-to-r from-primary via-emerald-400 to-primary transition-all hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-primary/20 cursor-pointer"
+            className={`relative p-[1.5px] rounded-full bg-gradient-to-r from-primary via-emerald-400 to-primary transition-all hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-primary/20 cursor-pointer ${
+              vistaActual === 'formulario' ? 'ring-2 ring-emerald-400/50' : ''
+            }`}
           >
             <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
               <span className="animate-bounce">🎸</span>
@@ -89,12 +97,10 @@ export default function Header({ onNavegar, vistaActual }: HeaderProps) {
           <button
             type="button"
             onClick={() => handleNavegacionMobile('editar')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              vistaActual === 'editar' ? 'bg-primary/20 text-white' : 'text-slate-300 hover:bg-slate-800'
-            }`}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-primary/40 bg-slate-800/80 text-white font-bold text-xs uppercase tracking-wider shadow-lg cursor-pointer hover:bg-slate-800"
           >
             <Edit3 className="w-4 h-4 text-primary" />
-            Modificar datos
+            <span>Modificar Datos</span>
           </button>
 
           <button

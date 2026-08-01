@@ -1,13 +1,27 @@
 import { useState } from 'react';
+import { Edit3 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 interface FooterProps {
   isAdmin: boolean;
   onLogout: () => void;
   onNavegar: (destino: 'formulario' | 'editar' | 'admin' | 'catalogo') => void;
+  // Añadimos opcionalmente los estados de debug por si deseas pasárselos desde App.tsx
+  mostrarDebug?: boolean;
+  setMostrarDebug?: (valor: boolean) => void;
+  testError?: string | boolean | null;
+  testCount?: number | null;
 }
 
-export default function Footer({ isAdmin, onLogout, onNavegar }: FooterProps) {
+export default function Footer({
+  isAdmin,
+  onLogout,
+  onNavegar,
+  mostrarDebug = false,
+  setMostrarDebug,
+  testError,
+  testCount,
+}: FooterProps) {
   const [mostrarLoginForm, setMostrarLoginForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +35,7 @@ export default function Footer({ isAdmin, onLogout, onNavegar }: FooterProps) {
 
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      
+
       if (error) {
         setErrorLogin('Credenciales inválidas');
       } else {
@@ -46,12 +60,21 @@ export default function Footer({ isAdmin, onLogout, onNavegar }: FooterProps) {
 
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-          
+
           {/* Columna 1: Identidad del proyecto */}
           <div className="space-y-3">
-            <h3 className="text-xl font-black uppercase tracking-wider text-white">
-              Catálogo de <span className="text-primary">Bandas</span>
-            </h3>
+            <button 
+              type="button"
+              onClick={() => onNavegar('catalogo')}
+              className="flex items-center gap-3 group cursor-pointer text-left focus:outline-none"
+            >
+              {/* Renderizado de tu logo de Canva */}
+              <img 
+                src="./public/logo.png" 
+                alt="Catálogo de Bandas" 
+                className="h-20 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
+              />          
+            </button>
             <p className="text-xs leading-relaxed text-muted-foreground max-w-sm">
               Archivo histórico y registro cultural de la escena musical de Coronel Suárez.
             </p>
@@ -63,22 +86,31 @@ export default function Footer({ isAdmin, onLogout, onNavegar }: FooterProps) {
               ¿Tenés una banda?
             </h4>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Sumá tu agrupación al registro público o actualizá tu legajo.
+              Sumá tu banda al registro público.
             </p>
-            <div className="flex flex-col gap-1 items-start">
-              <button 
+            <div className="flex flex-col gap-2 items-start">
+              <button
                 type="button"
                 onClick={() => onNavegar('formulario')}
-                className="text-xs font-semibold text-primary hover:underline hover:text-primary/80 transition-colors cursor-pointer"
+                className="relative p-[1.5px] rounded-full bg-gradient-to-r from-primary via-emerald-400 to-primary transition-all hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-primary/20 cursor-pointer"
               >
-                Postular nueva banda →
+                <div className="flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
+                  <span className="animate-bounce">🎸</span>
+                  <span>Inscribir Banda</span>
+                </div>
               </button>
-              <button 
+              <p className="text-xs leading-relaxed text-muted-foreground">
+              Actualizá los datos de tu banda.
+            </p>
+              <button
                 type="button"
                 onClick={() => onNavegar('editar')}
-                className="text-xs font-medium text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                className="relative p-[1.5px] rounded-full bg-gradient-to-r from-primary via-emerald-400 to-primary transition-all hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-primary/20 cursor-pointer"
               >
-                Solicitar modificación de datos
+                <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
+                  <Edit3 className="w-3.5 h-3.5 text-primary" />
+                  <span>Modificar Datos</span>
+                </div>
               </button>
             </div>
           </div>
@@ -101,7 +133,7 @@ export default function Footer({ isAdmin, onLogout, onNavegar }: FooterProps) {
 
         {/* Separador inferior */}
         <div className="border-t border-border/50 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-          
+
           <p className="text-white/40">
             © {new Date().getFullYear()} Catálogo de Bandas CS. Todos los derechos reservados.
           </p>
@@ -182,6 +214,19 @@ export default function Footer({ isAdmin, onLogout, onNavegar }: FooterProps) {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   Panel Admin
                 </button>
+
+                {/* 🟢 BOTÓN DE DEBUG SÓLO PARA ADMINS 🟢 */}
+                {setMostrarDebug && (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarDebug(!mostrarDebug)}
+                    className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors px-2 py-0.5 rounded border border-border/40 bg-background/50 cursor-pointer"
+                    title="Alternar estado de conexión"
+                  >
+                    {testError ? '🔴 Error DB' : `🟢 DB: ${testCount ?? '...'}`}
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={onLogout}
