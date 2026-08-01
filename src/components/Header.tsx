@@ -26,10 +26,10 @@ export default function Header({ onNavegar, vistaActual }: HeaderProps) {
         >
           {/* Renderizado de tu logo de Canva */}
           <img 
-            src="./public/logo.png" 
+            src={`${import.meta.env.BASE_URL}logo.png`} 
             alt="Catálogo de Bandas" 
-            className="h-16 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
-          />          
+            className="h-20 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
+          />       
         </button>
 
         {/* --- NAVEGACIÓN EN PANTALLAS GRANDES (md en adelante) --- */}

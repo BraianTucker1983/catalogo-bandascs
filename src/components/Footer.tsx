@@ -70,10 +70,10 @@ export default function Footer({
             >
               {/* Renderizado de tu logo de Canva */}
               <img 
-                src="./public/logo.png" 
+                src={`${import.meta.env.BASE_URL}logo.png`} 
                 alt="Catálogo de Bandas" 
                 className="h-20 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
-              />          
+              />        
             </button>
             <p className="text-xs leading-relaxed text-muted-foreground max-w-sm">
               Archivo histórico y registro cultural de la escena musical de Coronel Suárez.
@@ -94,7 +94,7 @@ export default function Footer({
                 onClick={() => onNavegar('formulario')}
                 className="relative p-[1.5px] rounded-full bg-gradient-to-r from-primary via-emerald-400 to-primary transition-all hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-primary/20 cursor-pointer"
               >
-                <div className="flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
+                <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
                   <span className="animate-bounce">🎸</span>
                   <span>Inscribir Banda</span>
                 </div>
