@@ -445,7 +445,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         </div>
 
         {/* CONTROLES DE NAVEGACIÓN ENTRE PASOS */}
-        <div className="flex gap-2 mt-8 relative z-10">
+        <div className="flex gap-2 mt-8 relative z-10 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 scrollbar-none">
           {[
             { id: 1, label: 'Información Básica', icon: Users },
             { id: 2, label: 'Integrantes', icon: Users },
@@ -458,13 +458,13 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
                 key={paso.id}
                 type="button"
                 onClick={() => setPasoActual(paso.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
                   activo 
                     ? 'bg-white text-slate-900 shadow-lg font-bold' 
                     : 'bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200 backdrop-blur-sm'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4 shrink-0" />
                 {paso.label}
               </button>
             );
