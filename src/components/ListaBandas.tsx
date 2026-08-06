@@ -17,8 +17,8 @@ export interface BandaResumen {
   nombre: string;
   genero?: string | null;
   historia?: string | null;
-  foto_portada?: string | null;
-  tema_color?: string | null;
+  url_portada?: string | null; // CORREGIDO: url_portada
+  color_tema?: string | null;  // CORREGIDO: color_tema
 }
 
 interface CatalogoBandasProps {
@@ -39,9 +39,11 @@ export default function CatalogoBandas({
     async function cargarBandas() {
       try {
         setCargando(true);
+        // CORREGIDO: Nombres exactos de las columnas y filtro por aprobado
         const { data, error } = await supabase
           .from('bandas')
-          .select('id, nombre, genero, historia, foto_portada, tema_color')
+          .select('id, nombre, genero, historia, url_portada, color_tema')
+          .eq('aprobado', true)
           .order('nombre', { ascending: true });
 
         if (error) throw error;
@@ -91,36 +93,34 @@ export default function CatalogoBandas({
       </div>
 
       {/* Barra de Búsqueda y Filtros */}
-<div className="flex flex-col md:flex-row gap-4 items-stretch md:items-start justify-between">
-  <input
-    type="text"
-    placeholder="Buscar por nombre o género..."
-    value={busqueda}
-    onChange={(e) => setBusqueda(e.target.value)}
-    className="w-full md:w-80 bg-card/60 border border-border/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors shrink-0"
-  />
+      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-start justify-between">
+        <input
+          type="text"
+          placeholder="Buscar por nombre o género..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="w-full md:w-80 bg-card/60 border border-border/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors shrink-0"
+        />
 
-  {generosDisponibles.length > 1 && (
-    /* Cambiamos 'overflow-x-auto' por 'flex-wrap' y removemos scrollbar */
-    <div className="flex flex-wrap items-center gap-2">
-      {generosDisponibles.map((gen) => (
-        <button
-          key={gen}
-          type="button"
-          onClick={() => setGeneroFiltro(gen)}
-          /* Eliminamos 'whitespace-nowrap' */
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-            generoFiltro === gen
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-card/60 border border-border/80 text-muted-foreground hover:text-white'
-          }`}
-        >
-          {gen}
-        </button>
-      ))}
-    </div>
-  )}
-</div>
+        {generosDisponibles.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {generosDisponibles.map((gen) => (
+              <button
+                key={gen}
+                type="button"
+                onClick={() => setGeneroFiltro(gen)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+                  generoFiltro === gen
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card/60 border border-border/80 text-muted-foreground hover:text-white'
+                }`}
+              >
+                {gen}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Listado / Grid */}
       {cargando ? (
@@ -134,15 +134,13 @@ export default function CatalogoBandas({
         <div className="text-center py-16 bg-card/20 border border-border/60 rounded-2xl space-y-2">
           <p className="text-white font-medium">No se encontraron bandas.</p>
           <p className="text-xs text-muted-foreground">
-            Intenta cambiar el término de búsqueda o agrega una nueva banda.
+            Intenta cambiar el término de búsqueda o aprueba las bandas desde el panel de administración.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {bandasFiltradas.map((banda) => {
-            const colorTema =
-              TEMAS_MAPA[banda.tema_color?.toLowerCase() || 'purple'] ||
-              TEMAS_MAPA.purple;
+            const colorHex = banda.color_tema || TEMAS_MAPA[banda.color_tema?.toLowerCase() || 'indigo'] || '#6366f1';
 
             return (
               <div
@@ -152,9 +150,9 @@ export default function CatalogoBandas({
               >
                 <div>
                   <div className="relative w-full h-48 bg-slate-950 overflow-hidden">
-                    {banda.foto_portada ? (
+                    {banda.url_portada ? (
                       <img
-                        src={banda.foto_portada}
+                        src={banda.url_portada}
                         alt={banda.nombre}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
@@ -170,7 +168,7 @@ export default function CatalogoBandas({
                     {banda.genero && (
                       <span
                         className="inline-block text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border bg-card/80"
-                        style={{ color: colorTema, borderColor: `${colorTema}50` }}
+                        style={{ color: colorHex, borderColor: `${colorHex}50` }}
                       >
                         {banda.genero}
                       </span>
@@ -189,7 +187,7 @@ export default function CatalogoBandas({
                 <div className="p-5 pt-0">
                   <div
                     className="w-full py-2.5 text-center text-xs font-bold uppercase tracking-wider rounded-xl border border-border/80 group-hover:border-primary/50 text-white transition-colors"
-                    style={{ backgroundColor: `${colorTema}15` }}
+                    style={{ backgroundColor: `${colorHex}20` }}
                   >
                     Ver Legajo Completo →
                   </div>

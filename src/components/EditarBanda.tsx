@@ -1,5 +1,22 @@
-import React, { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
+import React, { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { 
+  Users, 
+  Music, 
+  Image as ImageIcon, 
+  Plus, 
+  Trash2, 
+  Upload, 
+  Save, 
+  ArrowLeft, 
+  CheckCircle2, 
+  AlertCircle, 
+  Loader2, 
+  Sparkles,   
+  Disc,
+  Key,
+  X
+} from 'lucide-react';
 
 // --- TIPOS ---
 type Paso = 1 | 2 | 3;
@@ -36,6 +53,7 @@ export default function EditarBanda() {
   const [nombre, setNombre] = useState('');
   const [genero, setGenero] = useState('');
   const [historia, setHistoria] = useState('');
+  const [colorTema, setColorTema] = useState('#6366f1');
 
   // Portada
   const [portada, setPortada] = useState<File | null>(null);
@@ -53,7 +71,30 @@ export default function EditarBanda() {
   const [idsIntegrantesOriginales, setIdsIntegrantesOriginales] = useState<(string | number)[]>([]);
   const [idsCancionesOriginales, setIdsCancionesOriginales] = useState<(string | number)[]>([]);
 
-  // --- UTILIDAD: CONVERSIÓN Y OPTIMIZACIÓN A WEBP ---
+  // Gestión de Memoria (URLs de previsualización blob)
+  const activeObjectUrls = useRef<Set<string>>(new Set());
+
+  const crearObjectUrl = (file: File): string => {
+    const url = URL.createObjectURL(file);
+    activeObjectUrls.current.add(url);
+    return url;
+  };
+
+  const revocarObjectUrl = (url?: string | null) => {
+    if (url && activeObjectUrls.current.has(url)) {
+      URL.revokeObjectURL(url);
+      activeObjectUrls.current.delete(url);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      activeObjectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+      activeObjectUrls.current.clear();
+    };
+  }, []);
+
+  // --- OPTIMIZACIÓN A WEBP ---
   const optimizarEConvertirAWebP = (archivo: File, maxAncho = 1200, calidad = 0.8): Promise<File> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -122,7 +163,7 @@ export default function EditarBanda() {
     try {
       const { data: bandaData, error: bandaError } = await supabase
         .from('bandas')
-        .select('id, nombre, genero, historia, portada_url, palabra_clave')
+        .select('id, nombre, genero, historia, url_portada, color_tema, palabra_clave')
         .eq('palabra_clave', tokenLimpio)
         .maybeSingle();
 
@@ -140,7 +181,7 @@ export default function EditarBanda() {
       const [integrantesRes, cancionesRes] = await Promise.all([
         supabase
           .from('integrantes')
-          .select('id, nombre, instrumento, foto_url')
+          .select('id, nombre, instrumento, rol, foto_url')
           .eq('banda_id', bandaData.id),
         supabase
           .from('canciones')
@@ -155,8 +196,9 @@ export default function EditarBanda() {
       setNombre(bandaData.nombre || '');
       setGenero(bandaData.genero || '');
       setHistoria(bandaData.historia || '');
-      if (bandaData.portada_url) {
-        setPortadaPreviewUrl(bandaData.portada_url);
+      if (bandaData.color_tema) setColorTema(bandaData.color_tema);
+      if (bandaData.url_portada) {
+        setPortadaPreviewUrl(bandaData.url_portada);
       }
 
       const intData = integrantesRes.data || [];
@@ -171,7 +213,7 @@ export default function EditarBanda() {
               id: i.id,
               tempId: crypto.randomUUID(),
               nombre: i.nombre || '',
-              instrumento: i.instrumento || '',
+              instrumento: i.instrumento || i.rol || '',
               foto: null,
               fotoPreviewUrl: i.foto_url || null,
             }))
@@ -206,17 +248,6 @@ export default function EditarBanda() {
     }
   };
 
-  // --- NAVEGACIÓN PASOS ---
-  const cambiarPaso = (delta: number) => {
-    setPasoActual((prev) => {
-      const nuevoPaso = prev + delta;
-      if (nuevoPaso >= 1 && nuevoPaso <= 3) {
-        return nuevoPaso as Paso;
-      }
-      return prev;
-    });
-  };
-
   // --- MANEJO DE PORTADA ---
   const manejarSeleccionPortada = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -226,12 +257,9 @@ export default function EditarBanda() {
     try {
       setCargando(true);
       const archivoOptimizado = await optimizarEConvertirAWebP(archivoOriginal);
+      revocarObjectUrl(portadaPreviewUrl);
 
-      if (portadaPreviewUrl && portadaPreviewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(portadaPreviewUrl);
-      }
-
-      const previewUrl = URL.createObjectURL(archivoOptimizado);
+      const previewUrl = crearObjectUrl(archivoOptimizado);
       setPortada(archivoOptimizado);
       setPortadaPreviewUrl(previewUrl);
     } catch (error) {
@@ -243,9 +271,7 @@ export default function EditarBanda() {
   };
 
   const eliminarPortada = () => {
-    if (portadaPreviewUrl && portadaPreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(portadaPreviewUrl);
-    }
+    revocarObjectUrl(portadaPreviewUrl);
     setPortada(null);
     setPortadaPreviewUrl(null);
   };
@@ -267,11 +293,9 @@ export default function EditarBanda() {
       setCargando(true);
       const archivoOptimizado = await optimizarEConvertirAWebP(archivoOriginal, 800, 0.75);
 
-      if (integranteActual?.fotoPreviewUrl && integranteActual.fotoPreviewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(integranteActual.fotoPreviewUrl);
-      }
+      revocarObjectUrl(integranteActual?.fotoPreviewUrl);
 
-      const previewUrl = URL.createObjectURL(archivoOptimizado);
+      const previewUrl = crearObjectUrl(archivoOptimizado);
       actualizarIntegrante(index, 'foto', archivoOptimizado);
       actualizarIntegrante(index, 'fotoPreviewUrl', previewUrl);
     } catch (error) {
@@ -284,9 +308,7 @@ export default function EditarBanda() {
 
   const eliminarIntegrante = (index: number) => {
     const integrante = integrantes[index];
-    if (integrante?.fotoPreviewUrl && integrante.fotoPreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(integrante.fotoPreviewUrl);
-    }
+    revocarObjectUrl(integrante?.fotoPreviewUrl);
     setIntegrantes((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -313,23 +335,24 @@ export default function EditarBanda() {
       if (portada) {
         const rutaArchivo = `portadas/${Date.now()}_${portada.name}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('bandas')
-          .upload(rutaArchivo, portada);
+          .from('Bandas')
+          .upload(rutaArchivo, portada, { contentType: 'image/webp', upsert: true });
 
         if (uploadError) throw new Error(`Subida portada: ${uploadError.message}`);
 
-        const { data: publicUrlData } = supabase.storage.from('bandas').getPublicUrl(uploadData.path);
+        const { data: publicUrlData } = supabase.storage.from('Bandas').getPublicUrl(uploadData.path);
         urlPortadaFinal = publicUrlData.publicUrl;
       }
 
-      // 2. Actualizar datos generales de la banda
+      // 2. Actualizar datos generales
       const { error: errorBanda } = await supabase
         .from('bandas')
         .update({
           nombre,
           genero,
           historia,
-          portada_url: urlPortadaFinal,
+          color_tema: colorTema,
+          url_portada: urlPortadaFinal,
         })
         .eq('id', bandaId);
 
@@ -342,7 +365,6 @@ export default function EditarBanda() {
         (id) => !idsActualesIntegrantes.includes(id)
       );
 
-      // Borrar eliminados
       if (idsABorrarIntegrantes.length > 0) {
         const { error: errDelInt } = await supabase
           .from('integrantes')
@@ -351,19 +373,18 @@ export default function EditarBanda() {
         if (errDelInt) throw new Error(`Borrar integrantes: ${errDelInt.message}`);
       }
 
-      // Insertar o actualizar integrantes
       for (const integrante of integrantesValidos) {
         let urlFotoIntegrante = integrante.fotoPreviewUrl || null;
 
         if (integrante.foto) {
           const rutaFoto = `integrantes/${Date.now()}_${integrante.foto.name}`;
           const { data: uploadFoto, error: errorFoto } = await supabase.storage
-            .from('bandas')
-            .upload(rutaFoto, integrante.foto);
+            .from('Bandas')
+            .upload(rutaFoto, integrante.foto, { contentType: 'image/webp', upsert: true });
 
           if (errorFoto) throw new Error(`Subida foto integrante: ${errorFoto.message}`);
 
-          const { data: publicUrlFoto } = supabase.storage.from('bandas').getPublicUrl(uploadFoto.path);
+          const { data: publicUrlFoto } = supabase.storage.from('Bandas').getPublicUrl(uploadFoto.path);
           urlFotoIntegrante = publicUrlFoto.publicUrl;
         }
 
@@ -371,6 +392,7 @@ export default function EditarBanda() {
           banda_id: bandaId,
           nombre: integrante.nombre.trim(),
           instrumento: integrante.instrumento.trim() || null,
+          rol: integrante.instrumento.trim() || null,
           foto_url: urlFotoIntegrante,
         };
 
@@ -390,7 +412,6 @@ export default function EditarBanda() {
         (id) => !idsActualesCanciones.includes(id)
       );
 
-      // Borrar canciones eliminadas
       if (idsABorrarCanciones.length > 0) {
         const { error: errDelCanc } = await supabase
           .from('canciones')
@@ -399,7 +420,6 @@ export default function EditarBanda() {
         if (errDelCanc) throw new Error(`Borrar canciones: ${errDelCanc.message}`);
       }
 
-      // Insertar o actualizar canciones
       for (const cancion of cancionesValidas) {
         const payload = {
           banda_id: bandaId,
@@ -427,55 +447,16 @@ export default function EditarBanda() {
     }
   };
 
-  // --- ESTILOS EN LÍNEA COHERENTES CON EL FORMULARIO ---
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '0.625rem 0.875rem',
-    borderRadius: '0.5rem',
-    border: '1px solid #d1d5db',
-    fontSize: '0.875rem',
-    outline: 'none',
-    boxSizing: 'border-box',
-    backgroundColor: '#f9fafb',
-    color: '#111827',
-  };
-
-  // VISTA NO AUTENTICADO
+  // --- VISTA ACCESO CON TOKEN (NO AUTENTICADO) ---
   if (!autenticado) {
     return (
-      <div
-        style={{
-          maxWidth: '440px',
-          margin: '3rem auto',
-          padding: '2rem',
-          borderRadius: '1rem',
-          backgroundColor: '#ffffff',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)',
-          border: '1px solid #f3f4f6',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-        }}
-      >
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div
-            style={{
-              width: '48px',
-              height: '48px',
-              backgroundColor: '#eff6ff',
-              color: '#2563eb',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.25rem',
-              margin: '0 auto 0.75rem',
-            }}
-          >
-            🔑
+      <div className="max-w-md mx-auto my-12 bg-slate-900 text-slate-100 p-8 rounded-2xl shadow-2xl border border-slate-800">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center text-xl mx-auto mb-3 border border-indigo-500/20">
+            <Key className="w-6 h-6" />
           </div>
-          <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>
-            Modificar mi Banda
-          </h3>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280', lineHeight: 1.4 }}>
+          <h3 className="text-2xl font-extrabold text-white">Modificar mi Banda</h3>
+          <p className="text-slate-400 text-sm mt-1">
             Introduce la palabra clave secreta para acceder a la edición.
           </p>
         </div>
@@ -485,14 +466,15 @@ export default function EditarBanda() {
             e.preventDefault();
             cargarDatosBanda(tokenInput);
           }}
+          className="space-y-4"
         >
-          <div style={{ marginBottom: '1rem' }}>
+          <div>
             <input
               type="text"
               placeholder="Ej: metallica-2024"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
-              style={inputStyle}
+              className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
               required
             />
           </div>
@@ -500,444 +482,401 @@ export default function EditarBanda() {
           <button
             type="submit"
             disabled={cargando}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              backgroundColor: cargando ? '#93c5fd' : '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: cargando ? 'not-allowed' : 'pointer',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-            }}
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-lg font-semibold text-sm transition shadow-lg flex items-center justify-center gap-2"
           >
-            {cargando ? 'Verificando...' : 'Acceder al Perfil'}
+            {cargando ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Verificando...
+              </>
+            ) : (
+              'Acceder al Perfil'
+            )}
           </button>
         </form>
 
         {mensaje && (
-          <div
-            style={{
-              marginTop: '1.25rem',
-              padding: '0.75rem 1rem',
-              borderRadius: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              backgroundColor: mensaje.tipo === 'error' ? '#fef2f2' : '#f0fdf4',
-              color: mensaje.tipo === 'error' ? '#991b1b' : '#166534',
-              border: `1px solid ${mensaje.tipo === 'error' ? '#fecaca' : '#bbf7d0'}`,
-            }}
-          >
-            {mensaje.texto}
+          <div className={`mt-4 p-4 rounded-xl flex items-center gap-3 ${
+            mensaje.tipo === 'exito' 
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
+              : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+          }`}>
+            {mensaje.tipo === 'exito' ? (
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 shrink-0" />
+            )}
+            <p className="text-sm font-medium">{mensaje.texto}</p>
           </div>
         )}
       </div>
     );
   }
 
-  // VISTA EDICIÓN AUTENTICADO
+  // --- VISTA PANEL EDICIÓN (AUTENTICADO) ---
   return (
-    <div
-      style={{
-        maxWidth: '680px',
-        margin: '2rem auto',
-        padding: '2rem',
-        borderRadius: '1rem',
-        backgroundColor: '#ffffff',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)',
-        border: '1px solid #f3f4f6',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}
-    >
-      <div style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.5rem', fontWeight: 700, color: '#111827' }}>
-          Editar Perfil: <span style={{ color: '#2563eb' }}>{nombre || 'Mi Banda'}</span>
-        </h2>
-        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280' }}>
-          Paso {pasoActual} de 3
-        </span>
+    <div className="max-w-5xl mx-auto bg-slate-900 text-slate-100 rounded-2xl shadow-2xl overflow-hidden border border-slate-800 my-8">
+      
+      {/* HEADER DINÁMICO */}
+      <div 
+        className="relative p-8 transition-all duration-300 bg-cover bg-center"
+        style={{
+          backgroundColor: colorTema,
+          backgroundImage: portadaPreviewUrl 
+            ? `linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.95)), url(${portadaPreviewUrl})` 
+            : `linear-gradient(to bottom, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.95))`
+        }}
+      >
+        <div className="flex justify-between items-start relative z-10">
+          <div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md text-white mb-3">
+              <Sparkles className="w-3.5 h-3.5" /> Edición de Perfil
+            </span>
+            <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
+              {nombre || 'Mi Banda'}
+            </h1>
+            <p className="text-slate-300 text-sm mt-1 max-w-xl">
+              {genero ? genero : 'Personaliza la información de tu banda'}
+            </p>
+          </div>
+        </div>
+
+        {/* NAVEGACIÓN PASOS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8 relative z-10 w-full max-w-full">
+          {[
+            { id: 1, label: 'Información Básica', icon: Users },
+            { id: 2, label: 'Integrantes', icon: Users },
+            { id: 3, label: 'Música y Links', icon: Music },
+          ].map((paso) => {
+            const Icon = paso.icon;
+            const activo = pasoActual === paso.id;
+            return (
+              <button
+                key={paso.id}
+                type="button"
+                onClick={() => setPasoActual(paso.id as Paso)}
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 rounded-lg text-xs sm:text-sm transition-all text-center ${
+                  activo 
+                    ? 'bg-white text-slate-900 shadow-lg font-bold' 
+                    : 'bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200 backdrop-blur-sm'
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{paso.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {mensaje && (
-        <div
-          style={{
-            padding: '0.875rem 1rem',
-            marginBottom: '1.5rem',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            backgroundColor: mensaje.tipo === 'exito' ? '#f0fdf4' : '#fef2f2',
-            color: mensaje.tipo === 'exito' ? '#166534' : '#991b1b',
-            border: `1px solid ${mensaje.tipo === 'exito' ? '#bbf7d0' : '#fecaca'}`,
-          }}
-        >
-          {mensaje.texto}
-        </div>
-      )}
+      {/* FORMULARIO DE EDICIÓN */}
+      <form onSubmit={handleGuardarCambios} className="p-8">
+        
+        {/* MENSAJES DE ESTADO */}
+        {mensaje && (
+          <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
+            mensaje.tipo === 'exito' 
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
+              : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+          }`}>
+            {mensaje.tipo === 'exito' ? (
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 shrink-0" />
+            )}
+            <p className="text-sm font-medium">{mensaje.texto}</p>
+          </div>
+        )}
 
-      <form onSubmit={handleGuardarCambios}>
-        {/* PASO 1: INFORMACIÓN GENERAL Y PORTADA */}
+        {/* PASO 1: INFORMACIÓN BÁSICA Y PORTADA */}
         {pasoActual === 1 && (
-          <div>
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>
-              Paso 1: Información General y Portada
-            </h3>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div className="space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.375rem' }}>
-                  Nombre de la Banda
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Nombre de la Banda <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  required
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
-                  style={inputStyle}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  required
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.375rem' }}>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Género Musical
                 </label>
                 <input
                   type="text"
-                  required
                   value={genero}
                   onChange={(e) => setGenero(e.target.value)}
-                  style={inputStyle}
+                  placeholder="Ej: Rock, Pop, Metal..."
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  required
                 />
               </div>
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.375rem' }}>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Color de Marca / Tema
+              </label>
+              <div className="flex gap-3 items-center">
+                <input
+                  type="color"
+                  value={colorTema}
+                  onChange={(e) => setColorTema(e.target.value)}
+                  className="h-10 w-20 bg-slate-800 border border-slate-700 rounded cursor-pointer"
+                />
+                <span className="text-xs text-slate-400">
+                  Ajusta el color que identificará tu ficha en la plataforma.
+                </span>
+              </div>
+            </div>
+
+            {/* Subida y Previsualización de Portada */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Imagen de Portada
+              </label>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-800/30 hover:bg-slate-800/60 transition group">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-2 text-slate-500 group-hover:text-indigo-400 transition" />
+                      <p className="text-xs text-slate-400">
+                        <span className="font-semibold text-slate-300">Haz clic para cambiar imagen</span> o arrastra y suelta
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-1">PNG, JPG o WEBP (Se optimizará automáticamente)</p>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={manejarSeleccionPortada} 
+                      className="hidden" 
+                    />
+                  </label>
+                </div>
+
+                {portadaPreviewUrl && (
+                  <div className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-700/60">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={portadaPreviewUrl}
+                        alt="Portada"
+                        className="w-16 h-12 object-cover rounded-lg border border-slate-700"
+                      />
+                      <span className="text-xs text-slate-300">Imagen de portada seleccionada</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={eliminarPortada}
+                      className="p-2 text-slate-400 hover:text-rose-400 transition"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
                 Biografía / Historia
               </label>
               <textarea
                 rows={4}
                 value={historia}
                 onChange={(e) => setHistoria(e.target.value)}
-                style={{
-                  ...inputStyle,
-                  resize: 'vertical',
-                  minHeight: '100px',
-                }}
+                placeholder="Cuenta la trayectoria, discos, novedades..."
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
               />
-            </div>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.375rem' }}>
-                Imagen de Portada
-              </label>
-              <input type="file" accept="image/*" onChange={manejarSeleccionPortada} style={inputStyle} />
-
-              {portadaPreviewUrl && (
-                <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <img
-                    src={portadaPreviewUrl}
-                    alt="Vista previa portada"
-                    style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={eliminarPortada}
-                    style={{
-                      padding: '0.375rem 0.75rem',
-                      backgroundColor: '#fef2f2',
-                      color: '#ef4444',
-                      border: '1px solid #fecaca',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.8125rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Eliminar Portada
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button
-                type="button"
-                onClick={() => cambiarPaso(1)}
-                disabled={!nombre || !genero}
-                style={{
-                  padding: '0.625rem 1.25rem',
-                  backgroundColor: '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Siguiente
-              </button>
             </div>
           </div>
         )}
 
         {/* PASO 2: INTEGRANTES */}
         {pasoActual === 2 && (
-          <div>
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>
-              Paso 2: Integrantes
-            </h3>
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-200">Miembros de la Banda</h3>
+                <p className="text-xs text-slate-400">Gestiona la formación actual</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIntegrantes([...integrantes, { tempId: crypto.randomUUID(), nombre: '', instrumento: '', foto: null, fotoPreviewUrl: null }])}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow"
+              >
+                <Plus className="w-4 h-4" /> Agregar Miembro
+              </button>
+            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-              {integrantes.map((int, index) => (
-                <div
-                  key={int.id || int.tempId}
-                  style={{
-                    padding: '1rem',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '0.75rem',
-                    border: '1px solid #e5e7eb',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>
-                      Integrante #{index + 1}
-                    </span>
-                    {integrantes.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => eliminarIntegrante(index)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          backgroundColor: '#fef2f2',
-                          color: '#ef4444',
-                          border: '1px solid #fecaca',
-                          borderRadius: '0.375rem',
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        ✕ Eliminar
-                      </button>
-                    )}
-                  </div>
+            {integrantes.length === 0 ? (
+              <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-800">
+                <Users className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400 text-sm">No has añadido integrantes todavía.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {integrantes.map((int, index) => (
+                  <div key={int.id || int.tempId} className="p-4 bg-slate-800/40 border border-slate-700/60 rounded-xl flex gap-4 items-start relative group">
+                    <button
+                      type="button"
+                      onClick={() => eliminarIntegrante(index)}
+                      className="absolute top-3 right-3 text-slate-500 hover:text-rose-400 transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Nombre"
-                      value={int.nombre}
-                      onChange={(e) => actualizarIntegrante(index, 'nombre', e.target.value)}
-                      style={inputStyle}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Instrumento / Rol"
-                      value={int.instrumento}
-                      onChange={(e) => actualizarIntegrante(index, 'instrumento', e.target.value)}
-                      style={inputStyle}
-                    />
-                  </div>
-
-                  <div style={{ marginTop: '0.5rem' }}>
-                    <input type="file" accept="image/*" onChange={(e) => manejarFotoIntegrante(index, e)} style={inputStyle} />
-                    {int.fotoPreviewUrl && (
-                      <img
-                        src={int.fotoPreviewUrl}
-                        alt="Foto integrante"
-                        style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '50%', marginTop: '0.5rem' }}
+                    <label className="relative w-16 h-16 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden border border-slate-600 group-hover:border-indigo-500 transition">
+                      {int.fotoPreviewUrl ? (
+                        <img src={int.fotoPreviewUrl} alt="Integrante" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="w-6 h-6 text-slate-400" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => manejarFotoIntegrante(index, e)}
                       />
-                    )}
+                    </label>
+
+                    <div className="flex-1 space-y-2 pr-6">
+                      <input
+                        type="text"
+                        placeholder="Nombre del integrante"
+                        value={int.nombre}
+                        onChange={(e) => actualizarIntegrante(index, 'nombre', e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Instrumento / Rol"
+                        value={int.instrumento}
+                        onChange={(e) => actualizarIntegrante(index, 'instrumento', e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                setIntegrantes([
-                  ...integrantes,
-                  { tempId: crypto.randomUUID(), nombre: '', instrumento: '', foto: null, fotoPreviewUrl: null },
-                ])
-              }
-              style={{
-                padding: '0.5rem 0.875rem',
-                backgroundColor: '#ffffff',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              + Añadir Integrante
-            </button>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
-              <button
-                type="button"
-                onClick={() => cambiarPaso(-1)}
-                style={{
-                  padding: '0.625rem 1.25rem',
-                  backgroundColor: '#ffffff',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Atrás
-              </button>
-              <button
-                type="button"
-                onClick={() => cambiarPaso(1)}
-                style={{
-                  padding: '0.625rem 1.25rem',
-                  backgroundColor: '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Siguiente
-              </button>
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* PASO 3: CANCIONES Y MULTIMEDIA */}
         {pasoActual === 3 && (
-          <div>
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>
-              Paso 3: Canciones & Links Multimedia
-            </h3>
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-200">Canciones y Enlaces</h3>
+                <p className="text-xs text-slate-400">Enlaza tus temas o reproductores</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCanciones([...canciones, { tempId: crypto.randomUUID(), titulo: '', spotify_embed_url: '', youtube_embed_url: '' }])}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow"
+              >
+                <Plus className="w-4 h-4" /> Añadir Canción
+              </button>
+            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-              {canciones.map((can, index) => (
-                <div
-                  key={can.id || can.tempId}
-                  style={{
-                    padding: '1rem',
-                    backgroundColor: '#f0fdf4',
-                    borderRadius: '0.75rem',
-                    border: '1px solid #bbf7d0',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Título de la canción"
-                      value={can.titulo}
-                      onChange={(e) => actualizarCancion(index, 'titulo', e.target.value)}
-                      style={{ ...inputStyle, fontWeight: 600 }}
-                    />
-                    {canciones.length > 1 && (
+            {canciones.length === 0 ? (
+              <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-800">
+                <Disc className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400 text-sm">No has agregado canciones en la lista.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {canciones.map((can, index) => (
+                  <div key={can.id || can.tempId} className="p-4 bg-slate-800/40 border border-slate-700/60 rounded-xl space-y-3 relative">
+                    <div className="flex justify-between items-center gap-3">
+                      <input
+                        type="text"
+                        placeholder="Título de la canción"
+                        value={can.titulo}
+                        onChange={(e) => actualizarCancion(index, 'titulo', e.target.value)}
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
                       <button
                         type="button"
                         onClick={() => eliminarCancion(index)}
-                        style={{
-                          marginLeft: '0.5rem',
-                          padding: '0.625rem 0.75rem',
-                          backgroundColor: '#fef2f2',
-                          color: '#ef4444',
-                          border: '1px solid #fecaca',
-                          borderRadius: '0.5rem',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                        }}
+                        className="p-2 text-slate-500 hover:text-rose-400 transition"
                       >
-                        ✕
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Embed / Link de Spotify"
+                        value={can.spotify_embed_url}
+                        onChange={(e) => actualizarCancion(index, 'spotify_embed_url', e.target.value)}
+                        className="w-full bg-slate-800/80 border border-slate-700/80 rounded px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Embed / Link de YouTube"
+                        value={can.youtube_embed_url}
+                        onChange={(e) => actualizarCancion(index, 'youtube_embed_url', e.target.value)}
+                        className="w-full bg-slate-800/80 border border-slate-700/80 rounded px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginTop: '0.5rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Link / Embed de Spotify"
-                      value={can.spotify_embed_url}
-                      onChange={(e) => actualizarCancion(index, 'spotify_embed_url', e.target.value)}
-                      style={{ ...inputStyle, fontSize: '0.8125rem' }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Link / Embed de YouTube"
-                      value={can.youtube_embed_url}
-                      onChange={(e) => actualizarCancion(index, 'youtube_embed_url', e.target.value)}
-                      style={{ ...inputStyle, fontSize: '0.8125rem' }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                setCanciones([
-                  ...canciones,
-                  { tempId: crypto.randomUUID(), titulo: '', spotify_embed_url: '', youtube_embed_url: '' },
-                ])
-              }
-              style={{
-                padding: '0.5rem 0.875rem',
-                backgroundColor: '#ffffff',
-                color: '#15803d',
-                border: '1px solid #86efac',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              + Añadir Canción
-            </button>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
+        {/* ACCIONES DE BOTONES INFERIORES */}
+        <div className="mt-8 pt-6 border-t border-slate-800 flex justify-between items-center">
+          <div>
+            {pasoActual > 1 && (
               <button
                 type="button"
-                onClick={() => cambiarPaso(-1)}
-                style={{
-                  padding: '0.625rem 1.25rem',
-                  backgroundColor: '#ffffff',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                }}
+                onClick={() => setPasoActual((pasoActual - 1) as Paso)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition"
               >
-                Atrás
+                <ArrowLeft className="w-4 h-4" /> Anterior
               </button>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            {pasoActual < 3 ? (
+              <button
+                type="button"
+                onClick={() => setPasoActual((pasoActual + 1) as Paso)}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow-lg"
+              >
+                Siguiente
+              </button>
+            ) : (
               <button
                 type="submit"
                 disabled={cargando}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  backgroundColor: cargando ? '#86efac' : '#22c55e',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  cursor: cargando ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.2)',
-                }}
+                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white rounded-lg text-sm font-semibold transition shadow-lg disabled:cursor-not-allowed"
               >
-                {cargando ? 'Guardando Cambios...' : 'Guardar Cambios Oficiales'}
+                {cargando ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" /> Guardar Cambios
+                  </>
+                )}
               </button>
-            </div>
+            )}
           </div>
-        )}
+        </div>
+
       </form>
     </div>
   );

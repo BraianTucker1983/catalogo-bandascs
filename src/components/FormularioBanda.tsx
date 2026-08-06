@@ -13,9 +13,7 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Loader2, 
-  Sparkles, 
-  HelpCircle,
-  Eye,
+  Sparkles,   
   Disc,
   X
 } from 'lucide-react';
@@ -270,14 +268,14 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     const archivosSubidosStorage: string[] = [];
 
     try {
-      // 1. Subir Portada si existe
+      // 1. Subir Portada si existe (USANDO BUCKET 'Bandas')
       let urlPortadaFinal: string | null = null;
       if (portadaFile) {
         const webpBlob = await convertirAWebp(portadaFile, 1200, 0.85);
         const fileName = `portadas/${crypto.randomUUID()}.webp`;
         
         const { error: uploadErr } = await supabase.storage
-          .from('bandas')
+          .from('Bandas')
           .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
         if (uploadErr) throw new Error(`Error al subir la portada: ${uploadErr.message}`);
@@ -285,7 +283,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         archivosSubidosStorage.push(fileName);
         
         const { data: publicUrlData } = supabase.storage
-          .from('bandas')
+          .from('Bandas')
           .getPublicUrl(fileName);
 
         urlPortadaFinal = publicUrlData.publicUrl;
@@ -327,7 +325,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
             const fileName = `integrantes/${crypto.randomUUID()}.webp`;
 
             const { error: uploadIntErr } = await supabase.storage
-              .from('bandas')
+              .from('Bandas')
               .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
             if (uploadIntErr) throw new Error(`Error al subir la foto de ${integrante.nombre}`);
@@ -335,7 +333,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
             archivosSubidosStorage.push(fileName);
 
             const { data: publicUrlData } = supabase.storage
-              .from('bandas')
+              .from('Bandas')
               .getPublicUrl(fileName);
 
             urlFotoIntegrante = publicUrlData.publicUrl;
@@ -388,9 +386,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     } catch (err: any) {
       console.error('Error durante el proceso de guardado:', err);
       
-      // Rollback: Eliminar imágenes subidas si falló
+      // Rollback: Eliminar imágenes subidas si falló (USANDO BUCKET 'Bandas')
       if (archivosSubidosStorage.length > 0) {
-        await supabase.storage.from('bandas').remove(archivosSubidosStorage);
+        await supabase.storage.from('Bandas').remove(archivosSubidosStorage);
       }
 
       // Rollback: Eliminar registro de banda si se alcanzó a crear
@@ -731,7 +729,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
 
             <hr className="border-slate-800 my-6" />
 
-            {/* Seccion Canciones */}
+            {/* Sección Canciones */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
@@ -755,20 +753,27 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
               ) : (
                 <div className="space-y-3">
                   {canciones.map((cancion) => (
-                    <div key={cancion.id} className="flex gap-3 items-center bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
+                    <div key={cancion.id} className="flex flex-col sm:flex-row gap-3 items-center bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
                       <input
                         type="text"
                         placeholder="Título de la canción"
                         value={cancion.titulo}
                         onChange={(e) => actualizarCancion(cancion.id, 'titulo', e.target.value)}
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="flex-1 w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <input
+                        type="url"
+                        placeholder="URL audio MP3 (opcional)"
+                        value={cancion.url_audio}
+                        onChange={(e) => actualizarCancion(cancion.id, 'url_audio', e.target.value)}
+                        className="flex-1 w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />
                       <input
                         type="text"
-                        placeholder="ID de Spotify o URL Audio"
+                        placeholder="ID o Link Spotify"
                         value={cancion.spotify_id}
                         onChange={(e) => actualizarCancion(cancion.id, 'spotify_id', e.target.value)}
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="flex-1 w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />
                       <button
                         type="button"
