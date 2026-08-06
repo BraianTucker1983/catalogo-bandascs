@@ -16,9 +16,10 @@ export interface BandaResumen {
   id: string;
   nombre: string;
   genero?: string | null;
-  historia?: string | null;
-  url_portada?: string | null; // CORREGIDO: url_portada
-  color_tema?: string | null;  // CORREGIDO: color_tema
+  bio?: string | null;        // NUEVO: Biografía corta para las tarjetas
+  historia?: string | null;   // Mantenido para la landing/legajo completo
+  url_portada?: string | null; 
+  color_tema?: string | null;  
 }
 
 interface CatalogoBandasProps {
@@ -39,10 +40,10 @@ export default function CatalogoBandas({
     async function cargarBandas() {
       try {
         setCargando(true);
-        // CORREGIDO: Nombres exactos de las columnas y filtro por aprobado
+        // Traemos 'bio' para la tarjeta e 'historia' para el legajo
         const { data, error } = await supabase
           .from('bandas')
-          .select('id, nombre, genero, historia, url_portada, color_tema')
+          .select('id, nombre, genero, bio, historia, url_portada, color_tema')
           .eq('aprobado', true)
           .order('nombre', { ascending: true });
 
@@ -141,6 +142,9 @@ export default function CatalogoBandas({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {bandasFiltradas.map((banda) => {
             const colorHex = banda.color_tema || TEMAS_MAPA[banda.color_tema?.toLowerCase() || 'indigo'] || '#6366f1';
+            
+            // Priorizamos la biografía corta en las tarjetas; si no existe, mostramos un resumen de la historia.
+            const textoTarjeta = banda.bio || banda.historia;
 
             return (
               <div
@@ -176,9 +180,11 @@ export default function CatalogoBandas({
                     <h3 className="text-xl font-black uppercase tracking-tight text-white group-hover:text-primary transition-colors">
                       {banda.nombre}
                     </h3>
-                    {banda.historia && (
+                    
+                    {/* Render de Biografía Corta en Card con corte elegante de 2 líneas */}
+                    {textoTarjeta && (
                       <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
-                        {banda.historia}
+                        {textoTarjeta}
                       </p>
                     )}
                   </div>

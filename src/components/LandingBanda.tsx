@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-// Mapa de colores basado en las opciones del formulario
+// Mapa de colores
 const TEMAS_MAPA: Record<string, { primary: string; bgGlow: string }> = {
   purple: { primary: '#a855f7', bgGlow: 'rgba(168, 85, 247, 0.25)' },
   emerald: { primary: '#10b981', bgGlow: 'rgba(16, 185, 129, 0.25)' },
@@ -16,27 +16,29 @@ const TEMAS_MAPA: Record<string, { primary: string; bgGlow: string }> = {
 interface Integrante {
   id: string | number;
   nombre: string;
-  instrumento?: string | null;
-  foto?: string | null;
+  rol?: string | null;       // CORREGIDO (coincide con 'rol' del formulario)
+  foto_url?: string | null;  // CORREGIDO (coincide con 'foto_url' del formulario)
   instagram?: string | null;
 }
 
 interface Cancion {
   id: string | number;
   titulo: string;
-  spotify_embed_url?: string | null;
-  youtube_embed_url?: string | null;
+  url_audio?: string | null; // CORREGIDO
+  spotify_id?: string | null; // CORREGIDO
 }
 
 interface BandaDetalle {
   id: string | number;
   nombre: string;
   genero?: string | null;
+  bio?: string | null;
   historia?: string | null;
-  foto_portada?: string | null;
+  url_portada?: string | null; // CORREGIDO (coincide con 'url_portada' del formulario)
   instagram_url?: string | null;
-  spotify_artist_url?: string | null;
-  tema_color?: string | null;
+  spotify_url?: string | null; // CORREGIDO
+  youtube_url?: string | null;  // CORREGIDO
+  color_tema?: string | null;   // CORREGIDO (coincide con 'color_tema' del formulario)
   integrantes?: Integrante[];
   canciones?: Cancion[];
 }
@@ -144,9 +146,13 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
   }, [bandaId]);
 
   const temaActivo = useMemo(() => {
-    const claveTema = banda?.tema_color?.toLowerCase() || 'purple';
-    return TEMAS_MAPA[claveTema] || TEMAS_MAPA.purple;
-  }, [banda?.tema_color]);
+    const rawColor = banda?.color_tema || '#6366f1';
+    if (rawColor.startsWith('#')) {
+      return { primary: rawColor, bgGlow: `${rawColor}40` };
+    }
+    const claveTema = rawColor.toLowerCase();
+    return TEMAS_MAPA[claveTema] || TEMAS_MAPA.indigo;
+  }, [banda?.color_tema]);
 
   if (cargando) {
     return (
@@ -202,16 +208,16 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
 
         {/* Encabezado Principal / Hero */}
         <header className="text-center space-y-6 pt-2">
-          {banda.foto_portada && (
+          {banda.url_portada && (
             <div className="w-full rounded-2xl overflow-hidden border border-border/60 shadow-2xl relative bg-slate-950/80 p-3 md:p-6 flex items-center justify-center">
               <img
-                src={banda.foto_portada}
+                src={banda.url_portada}
                 alt=""
                 aria-hidden="true"
                 className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none scale-125"
               />
               <img
-                src={banda.foto_portada}
+                src={banda.url_portada}
                 alt={banda.nombre}
                 className="relative z-10 w-full max-w-2xl h-auto object-contain rounded-xl drop-shadow-2xl"
               />
@@ -240,7 +246,7 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
             />
           </div>
 
-          {(banda.instagram_url || banda.spotify_artist_url) && (
+          {(banda.instagram_url || banda.spotify_url || banda.youtube_url) && (
             <div className="flex items-center justify-center gap-3 pt-2">
               {banda.instagram_url && (
                 <a
@@ -252,9 +258,9 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                   Instagram ↗
                 </a>
               )}
-              {banda.spotify_artist_url && (
+              {banda.spotify_url && (
                 <a
-                  href={banda.spotify_artist_url}
+                  href={banda.spotify_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs font-bold uppercase tracking-wider px-4 py-2 bg-card border border-border rounded-lg text-emerald-400 hover:border-emerald-500 transition-colors"
@@ -262,34 +268,43 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                   Spotify ↗
                 </a>
               )}
+              {banda.youtube_url && (
+                <a
+                  href={banda.youtube_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold uppercase tracking-wider px-4 py-2 bg-card border border-border rounded-lg text-rose-400 hover:border-rose-500 transition-colors"
+                >
+                  YouTube ↗
+                </a>
+              )}
             </div>
           )}
         </header>
 
         {/* Biografía / Historia */}
-        {banda.historia && (
+        {(banda.historia || banda.bio) && (
           <section className="bg-card/40 border border-border/80 p-6 md:p-8 rounded-2xl backdrop-blur-md shadow-lg space-y-3">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <span style={{ color: temaActivo.primary }}>///</span> Biografía & Reseña
             </h2>
             <p className="text-slate-200 leading-relaxed text-justify whitespace-pre-line text-sm md:text-base">
-              {banda.historia}
+              {banda.historia || banda.bio}
             </p>
           </section>
         )}
 
-        {/* Formación / Integrantes en Grid Responsivo */}
+        {/* Formación / Integrantes */}
         {banda.integrantes && banda.integrantes.length > 0 && (
           <section className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1 flex items-center gap-2">
               <span style={{ color: temaActivo.primary }}>///</span> Formación / Integrantes
             </h2>
 
-            {/* Grid de 1 columna en mobile, 2 en sm, 3 en md */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {banda.integrantes.map((miembro) => {
                 const fotoSrc =
-                  miembro.foto ||
+                  miembro.foto_url ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(
                     miembro.nombre || 'Integrante'
                   )}&background=1e293b&color=fff&size=400`;
@@ -309,9 +324,9 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                       </div>
                       <div>
                         <p className="font-bold text-white text-base md:text-lg">{miembro.nombre}</p>
-                        {miembro.instrumento && (
+                        {miembro.rol && (
                           <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                            {miembro.instrumento}
+                            {miembro.rol}
                           </p>
                         )}
                       </div>
@@ -335,7 +350,7 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           </section>
         )}
 
-        {/* Canciones & Reproductores */}
+        {/* Canciones / Singles */}
         {banda.canciones && banda.canciones.length > 0 && (
           <section className="space-y-6">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground pl-1 flex items-center gap-2">
@@ -343,10 +358,7 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
             </h2>
             <div className="space-y-6">
               {banda.canciones.map((cancion) => {
-                const spotifyUrl = parseSpotifyEmbed(cancion.spotify_embed_url);
-                const youtubeUrl = parseYoutubeEmbed(cancion.youtube_embed_url);
-
-                if (!spotifyUrl && !youtubeUrl) return null;
+                const spotifyUrl = parseSpotifyEmbed(cancion.spotify_id);
 
                 return (
                   <div
@@ -369,19 +381,12 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                       </div>
                     )}
 
-                    {youtubeUrl && (
-                      <div className="rounded-xl overflow-hidden aspect-video w-full shadow-md bg-black">
-                        <iframe
-                          src={youtubeUrl}
-                          title={`YouTube vídeo para ${cancion.titulo}`}
-                          width="100%"
-                          height="100%"
-                          className="w-full h-full border-0 block"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          referrerPolicy="strict-origin-when-cross-origin"
-                          allowFullScreen
-                          loading="lazy"
-                        />
+                    {cancion.url_audio && (
+                      <div className="pt-2">
+                        <audio controls className="w-full">
+                          <source src={cancion.url_audio} type="audio/mpeg" />
+                          Tu navegador no soporta el reproductor de audio.
+                        </audio>
                       </div>
                     )}
                   </div>
