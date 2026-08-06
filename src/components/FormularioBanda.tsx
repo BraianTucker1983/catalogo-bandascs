@@ -15,7 +15,12 @@ import {
   Loader2, 
   Sparkles,   
   Disc,
-  X
+  X,
+  Mail,
+  Key,
+  RefreshCw,
+  Copy,
+  Check
 } from 'lucide-react';
 
 interface FormBandaProps {
@@ -44,13 +49,21 @@ const GENEROS_DISPONIBLES = [
   'Folk', 'Cumbia', 'Ska', 'Funk', 'Soul', 'R&B'
 ];
 
+// Función para generar un token / palabra clave aleatoria corta y legible
+const generarTokenAleatorio = () => {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+};
+
 export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => {
-  // --- ESTADOS BÁSICOS ---
+  // --- ESTADOS BÁSICOS & AUTENTICACIÓN ---
   const [nombre, setNombre] = useState('');
+  const [email, setEmail] = useState('');
+  const [palabraClave, setPalabraClave] = useState(generarTokenAleatorio()); // Visible por defecto
+  const [copiado, setCopiado] = useState(false);
   const [genero, setGenero] = useState<string[]>([]);
   const [bio, setBio] = useState('');
   const [historia, setHistoria] = useState('');
-  const [colorTema, setColorTema] = useState('#6366f1'); // Indigo por defecto
+  const [colorTema, setColorTema] = useState('#6366f1');
 
   // --- REDES SOCIALES ---
   const [spotifyUrl, setSpotifyUrl] = useState('');
@@ -86,13 +99,19 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     }
   };
 
-  // Limpieza total al desmontar el componente (Previene Fugas de Memoria)
   useEffect(() => {
     return () => {
       activeObjectUrls.current.forEach((url) => URL.revokeObjectURL(url));
       activeObjectUrls.current.clear();
     };
   }, []);
+
+  // Copiar palabra clave al portapapeles
+  const copiarClave = () => {
+    navigator.clipboard.writeText(palabraClave);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  };
 
   // --- MANEJADORES DE GÉNEROS ---
   const toggleGenero = (g: string) => {
@@ -177,7 +196,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     setCanciones(canciones.filter((c) => c.id !== id));
   };
 
-  // --- CONVERSIÓN DE IMAGEN A WEBP (Optimizada en Cliente) ---
+  // --- CONVERSIÓN DE IMAGEN A WEBP ---
   const convertirAWebp = (file: File, maxAncho = 1200, calidad = 0.8): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -226,8 +245,8 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     });
   };
 
-  // --- ENVÍO DE EMAIL DE NOTIFICACIÓN ---
-  const enviarEmailNotificacion = async (nombreBanda: string) => {
+  // --- ENVÍO DE EMAIL CON TOKEN / PALABRA CLAVE VÍA EMAILJS ---
+  const enviarEmailNotificacion = async (nombreBanda: string, emailDestino: string, clave: string) => {
     const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
     const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
     const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
@@ -242,9 +261,10 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         serviceId,
         templateId,
         {
+          to_email: emailDestino,
           nombre_banda: nombreBanda,
+          clave: clave, // Se envía la clave a la plantilla de EmailJS
           fecha_registro: new Date().toLocaleString('es-AR'),
-          mensaje: `Se ha registrado exitosamente la banda "${nombreBanda}".`
         },
         publicKey
       );
@@ -253,22 +273,63 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     }
   };
 
-  // --- GUARDAR BANDA (SUBMIT CON ROLLBACK) ---
+ // --- GUARDAR BANDA ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validaciones iniciales
     if (!nombre.trim()) {
       setMensajeEstado({ tipo: 'error', texto: 'El nombre de la banda es obligatorio.' });
+      setPasoActual(1);
+      return;
+    }
+
+    if (!email.trim() || !email.includes('@')) {
+      setMensajeEstado({ tipo: 'error', texto: 'Debes ingresar un correo electrónico válido.' });
+      setPasoActual(1);
+      return;
+    }
+
+    if (!palabraClave.trim()) {
+      setMensajeEstado({ tipo: 'error', texto: 'Debes incluir una palabra clave o token para la edición posterior.' });
+      setPasoActual(1);
       return;
     }
 
     setLoading(true);
     setMensajeEstado(null);
 
+    // Normalizamos las variables para uso consistente
+    const emailLimpio = email.trim().toLowerCase();
+    const claveLimpia = palabraClave.trim(); 
+    const nombreLimpio = nombre.trim();
+
+    // 🔍 Pre-verificación: ¿Ya existe una banda con este nombre?
+    try {
+      const { data: existeBanda } = await supabase
+        .from('bandas')
+        .select('id')
+        .ilike('nombre', nombreLimpio)
+        .maybeSingle();
+
+      if (existeBanda) {
+        setMensajeEstado({
+          tipo: 'error',
+          texto: `La banda "${nombreLimpio}" ya se encuentra registrada en el Catálogo. Si eres integrante, utiliza tu palabra clave para modificar sus datos.`,
+        });
+        setPasoActual(1); // Regresamos al paso 1
+        setLoading(false);
+        return;
+      }
+    } catch (checkErr) {
+      console.warn('No se pudo verificar el nombre previamente:', checkErr);
+    }
+
     let bandaIdCreada: string | null = null;
     const archivosSubidosStorage: string[] = [];
 
     try {
-      // 1. Subir Portada si existe (USANDO BUCKET 'Bandas')
+      // 1. Subir Portada
       let urlPortadaFinal: string | null = null;
       if (portadaFile) {
         const webpBlob = await convertirAWebp(portadaFile, 1200, 0.85);
@@ -289,29 +350,32 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         urlPortadaFinal = publicUrlData.publicUrl;
       }
 
-      // 2. Insertar Banda en Base de Datos
+      // 2. Insertar Banda guardando email y palabra clave
       const { data: bandaData, error: bandaErr } = await supabase
         .from('bandas')
         .insert([
           {
-            nombre,
+            nombre: nombreLimpio,
+            email: emailLimpio,
+            palabra_clave: claveLimpia,
             genero: genero.join(', '),
-            bio,
-            historia,
+            bio: bio.trim(),
+            historia: historia.trim(),
             color_tema: colorTema,
             url_portada: urlPortadaFinal,
-            spotify_url: spotifyUrl,
-            instagram_url: instagramUrl,
-            youtube_url: youtubeUrl,
+            spotify_url: spotifyUrl.trim(),
+            instagram_url: instagramUrl.trim(),
+            youtube_url: youtubeUrl.trim(),
+            aprobado: false
           },
         ])
         .select()
         .single();
 
-      if (bandaErr) throw new Error(`Error al guardar la banda: ${bandaErr.message}`);
+      if (bandaErr) throw bandaErr; // Lanzamos el objeto de error directo para evaluar su código en el catch
       bandaIdCreada = bandaData.id;
 
-      // 3. Procesar e Insertar Integrantes
+      // 3. Insertar Integrantes
       if (integrantes.length > 0) {
         const integrantesParaInsertar = [];
 
@@ -341,8 +405,8 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
 
           integrantesParaInsertar.push({
             banda_id: bandaIdCreada,
-            nombre: integrante.nombre,
-            rol: integrante.rol,
+            nombre: integrante.nombre.trim(),
+            rol: integrante.rol.trim(),
             foto_url: urlFotoIntegrante,
           });
         }
@@ -361,9 +425,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         .filter((c) => c.titulo.trim() !== '')
         .map((c) => ({
           banda_id: bandaIdCreada,
-          titulo: c.titulo,
-          url_audio: c.url_audio,
-          spotify_id: c.spotify_id,
+          titulo: c.titulo.trim(),
+          url_audio: c.url_audio.trim(),
+          spotify_id: c.spotify_id.trim(),
         }));
 
       if (cancionesValidas.length > 0) {
@@ -374,41 +438,54 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         if (cancErr) throw new Error(`Error al guardar canciones: ${cancErr.message}`);
       }
 
-      // 5. Notificación por EmailJS
-      await enviarEmailNotificacion(nombre);
+      // 5. Enviar Email con la Clave / Token de Edición vía EmailJS
+      await enviarEmailNotificacion(nombreLimpio, emailLimpio, claveLimpia);
 
-      setMensajeEstado({ tipo: 'exito', texto: '¡Banda publicada con éxito!' });
+      setMensajeEstado({ 
+        tipo: 'exito', 
+        texto: `¡Banda registrada con éxito! Te enviamos tu palabra clave (${claveLimpia}) al correo guardado.` 
+      });
       
       if (onSuccess) {
-        setTimeout(onSuccess, 1500);
+        setTimeout(onSuccess, 3000);
       }
 
     } catch (err: any) {
       console.error('Error durante el proceso de guardado:', err);
       
-      // Rollback: Eliminar imágenes subidas si falló (USANDO BUCKET 'Bandas')
+      // Rollback de archivos subidos si ocurre un error
       if (archivosSubidosStorage.length > 0) {
         await supabase.storage.from('Bandas').remove(archivosSubidosStorage);
       }
 
-      // Rollback: Eliminar registro de banda si se alcanzó a crear
+      // Rollback del registro en la tabla bandas
       if (bandaIdCreada) {
         await supabase.from('bandas').delete().eq('id', bandaIdCreada);
       }
 
+      // --- MENSAJE ELEGANTE PARA DUPLICADOS U OTROS ERRORES ---
+      let textoError = err.message || 'Ocurrió un error inesperado. Por favor reintenta.';
+
+      // Verificamos si el error es de unicidad de Supabase / PostgreSQL (Código 23505)
+      if (err.code === '23505' || err.message?.includes('bandas_nombre_unique_idx')) {
+        textoError = `La banda "${nombreLimpio}" ya se encuentra registrada en el Catálogo. Si eres integrante de esta banda, utiliza tu palabra clave para modificar sus datos.`;
+        setPasoActual(1); // Regresamos al usuario al paso del nombre
+      }
+
       setMensajeEstado({
         tipo: 'error',
-        texto: err.message || 'Ocurrió un error inesperado. Por favor reintenta.',
+        texto: textoError,
       });
     } finally {
       setLoading(false);
     }
   };
 
+  
   return (
     <div className="max-w-5xl mx-auto bg-slate-900 text-slate-100 rounded-2xl shadow-2xl overflow-hidden border border-slate-800 my-8">
       
-      {/* HEADER CON PREVISUALIZACIÓN DE COLOR DE TEMA Y PORTADA */}
+      {/* HEADER */}
       <div 
         className="relative p-8 transition-all duration-300 bg-cover bg-center"
         style={{
@@ -442,7 +519,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
           )}
         </div>
 
-        {/* CONTROLES DE NAVEGACIÓN ENTRE PASOS */}
+        {/* NAVEGACIÓN PASOS */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8 relative z-10 w-full max-w-full">
           {[
             { id: 1, label: 'Información Básica', icon: Users },
@@ -470,10 +547,10 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         </div>
       </div>
 
-      {/* FORMULARIO PRINCIPAL */}
+      {/* FORMULARIO */}
       <form onSubmit={handleSubmit} className="p-8">
         
-        {/* MENSAJES DE ESTADO */}
+        {/* ALERTAS */}
         {mensajeEstado && (
           <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
             mensajeEstado.tipo === 'exito' 
@@ -489,26 +566,85 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
           </div>
         )}
 
-        {/* PASO 1: INFORMACIÓN BÁSICA */}
+        {/* PASO 1 */}
         {pasoActual === 1 && (
           <div className="space-y-6 animate-fade-in">
+            {/* Nombre */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Nombre de la Banda <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Ej: Los Pericos, Soda Stereo..."
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                required
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Nombre */}
+              {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Nombre de la Banda <span className="text-rose-500">*</span>
+                  Correo Electrónico <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Ej: Los Pericos, Soda Stereo..."
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                  required
-                />
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="contacto@banda.com"
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-lg pl-9 pr-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition text-sm"
+                    required
+                  />
+                </div>
               </div>
 
+              {/* PALABRA CLAVE VISIBLE / TOKEN */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Palabra Clave / Token de Edición <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative flex items-center">
+                  <Key className="w-4 h-4 text-indigo-400 absolute left-3" />
+                  <input
+                    type="text"
+                    value={palabraClave}
+                    onChange={(e) => setPalabraClave(e.target.value)}
+                    className="w-full bg-indigo-950/40 border border-indigo-500/40 rounded-lg pl-9 pr-20 py-2.5 text-indigo-200 font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    required
+                  />
+                  
+                  {/* Botones de acción rápida: Generar y Copiar */}
+                  <div className="absolute right-2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPalabraClave(generarTokenAleatorio())}
+                      title="Generar nueva clave"
+                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={copiarClave}
+                      title="Copiar palabra clave"
+                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition"
+                    >
+                      {copiado ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  Copia o personaliza esta clave. Además, se enviará una copia al email registrado para que la conserves.
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Color Personalizado */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -522,9 +658,23 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
                     className="h-10 w-20 bg-slate-800 border border-slate-700 rounded cursor-pointer"
                   />
                   <span className="text-xs text-slate-400">
-                    Este color personalizará el encabezado y detalles de tu ficha.
+                    Este color personalizará el encabezado de tu ficha.
                   </span>
                 </div>
+              </div>
+
+              {/* Bio Corta */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Biografía Corta
+                </label>
+                <textarea
+                  rows={2}
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Resumen rápido de la banda para la tarjeta..."
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                />
               </div>
             </div>
 
@@ -578,20 +728,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
               </div>
             </div>
 
-            {/* Bio Corta */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Biografía Corta
-              </label>
-              <textarea
-                rows={2}
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Resumen rápido de la banda para la tarjeta de presentación..."
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              />
-            </div>
-
             {/* Historia Completa */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -608,7 +744,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
           </div>
         )}
 
-        {/* PASO 2: INTEGRANTES */}
+        {/* PASO 2 */}
         {pasoActual === 2 && (
           <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center mb-4">
@@ -642,7 +778,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
                       <Trash2 className="w-4 h-4" />
                     </button>
 
-                    {/* Previsualización Foto de Integrante */}
                     <label className="relative w-16 h-16 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden border border-slate-600 group-hover:border-indigo-500 transition">
                       {item.foto_preview ? (
                         <img src={item.foto_preview} alt="Integrante" className="w-full h-full object-cover" />
@@ -684,10 +819,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
           </div>
         )}
 
-        {/* PASO 3: MÚSICA Y REDES */}
+        {/* PASO 3 */}
         {pasoActual === 3 && (
           <div className="space-y-6 animate-fade-in">
-            {/* Redes Sociales */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-200">Enlaces y Redes</h3>
               
@@ -729,7 +863,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
 
             <hr className="border-slate-800 my-6" />
 
-            {/* Sección Canciones */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
@@ -790,7 +923,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
           </div>
         )}
 
-        {/* ACCIONES DE BOTONES INFERIORES */}
+        {/* NAVEGACIÓN INFERIOR */}
         <div className="mt-8 pt-6 border-t border-slate-800 flex justify-between items-center">
           <div>
             {pasoActual > 1 && (

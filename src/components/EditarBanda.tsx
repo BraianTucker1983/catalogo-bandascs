@@ -15,6 +15,7 @@ import {
   Sparkles,   
   Disc,
   Key,
+  Mail,
   X
 } from 'lucide-react';
 
@@ -39,8 +40,9 @@ interface CancionInput {
 }
 
 export default function EditarBanda() {
-  // Autenticación por palabra clave
-  const [tokenInput, setTokenInput] = useState('');
+  // Autenticación por email + palabra clave
+  const [emailInput, setEmailInput] = useState('');
+  const [palabraClaveInput, setPalabraClaveInput] = useState('');
   const [autenticado, setAutenticado] = useState(false);
   const [bandaId, setBandaId] = useState('');
 
@@ -138,22 +140,26 @@ export default function EditarBanda() {
     });
   };
 
-  // Detectar token en URL
+  // Detectar token o email en URL si fuera necesario
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    const emailUrl = urlParams.get('email');
     const tokenUrl = urlParams.get('token');
-    if (tokenUrl) {
-      setTokenInput(tokenUrl);
-      cargarDatosBanda(tokenUrl);
+    
+    if (emailUrl && tokenUrl) {
+      setEmailInput(emailUrl);
+      setPalabraClaveInput(tokenUrl);
+      cargarDatosBanda(emailUrl, tokenUrl);
     }
   }, []);
 
   // --- CARGA DE DATOS DESDE SUPABASE ---
-  const cargarDatosBanda = async (token: string) => {
-    const tokenLimpio = token.trim().toLowerCase();
+  const cargarDatosBanda = async (email: string, palabraClave: string) => {
+    const emailLimpio = email.trim().toLowerCase();
+    const palabraClaveLimpia = palabraClave.trim().toLowerCase();
 
-    if (!tokenLimpio) {
-      setMensaje({ tipo: 'error', texto: 'Por favor, introduce un código secreto válido.' });
+    if (!emailLimpio || !palabraClaveLimpia) {
+      setMensaje({ tipo: 'error', texto: 'Por favor, ingresa tu email y palabra clave.' });
       return;
     }
 
@@ -163,8 +169,9 @@ export default function EditarBanda() {
     try {
       const { data: bandaData, error: bandaError } = await supabase
         .from('bandas')
-        .select('id, nombre, genero, historia, url_portada, color_tema, palabra_clave')
-        .eq('palabra_clave', tokenLimpio)
+        .select('id, nombre, genero, historia, url_portada, color_tema, palabra_clave, email')
+        .eq('email', emailLimpio)
+        .eq('palabra_clave', palabraClaveLimpia)
         .maybeSingle();
 
       if (bandaError) throw bandaError;
@@ -172,7 +179,7 @@ export default function EditarBanda() {
       if (!bandaData) {
         setMensaje({
           tipo: 'error',
-          texto: 'Código secreto inválido. Verifícalo e inténtalo de nuevo.',
+          texto: 'Email o palabra clave incorrectos. Verifícalos e inténtalo de nuevo.',
         });
         setAutenticado(false);
         return;
@@ -437,7 +444,7 @@ export default function EditarBanda() {
         }
       }
 
-      await cargarDatosBanda(tokenInput);
+      await cargarDatosBanda(emailInput, palabraClaveInput);
       setMensaje({ tipo: 'exito', texto: '¡El perfil de la banda ha sido actualizado con éxito!' });
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : 'Error al guardar los cambios.';
@@ -447,7 +454,7 @@ export default function EditarBanda() {
     }
   };
 
-  // --- VISTA ACCESO CON TOKEN (NO AUTENTICADO) ---
+  // --- VISTA ACCESO (NO AUTENTICADO) ---
   if (!autenticado) {
     return (
       <div className="max-w-md mx-auto my-12 bg-slate-900 text-slate-100 p-8 rounded-2xl shadow-2xl border border-slate-800">
@@ -457,23 +464,40 @@ export default function EditarBanda() {
           </div>
           <h3 className="text-2xl font-extrabold text-white">Modificar mi Banda</h3>
           <p className="text-slate-400 text-sm mt-1">
-            Introduce la palabra clave secreta para acceder a la edición.
+            Ingresa tu email y palabra clave para acceder a la edición.
           </p>
         </div>
 
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            cargarDatosBanda(tokenInput);
+            cargarDatosBanda(emailInput, palabraClaveInput);
           }}
           className="space-y-4"
         >
           <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-indigo-400" /> Correo Electrónico
+            </label>
             <input
-              type="text"
-              placeholder="Ej: metallica-2024"
-              value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value)}
+              type="email"
+              placeholder="tu@email.com"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-indigo-400" /> Palabra Clave
+            </label>
+            <input
+              type="password"
+              placeholder="Tu palabra clave personalizada"
+              value={palabraClaveInput}
+              onChange={(e) => setPalabraClaveInput(e.target.value)}
               className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
               required
             />
@@ -482,7 +506,7 @@ export default function EditarBanda() {
           <button
             type="submit"
             disabled={cargando}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-lg font-semibold text-sm transition shadow-lg flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-lg font-semibold text-sm transition shadow-lg flex items-center justify-center gap-2 mt-2"
           >
             {cargando ? (
               <>
