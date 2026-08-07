@@ -102,7 +102,7 @@ export default function CatalogoBandas({
       {/* Header Fijo Estilo Gmail */}
       <header className="shrink-0 border-b border-border/60 bg-card/20 px-6 py-4 flex items-center justify-between z-10">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-white">
+          <h1 className="sr-only text-2xl font-black uppercase tracking-tight text-white">
             Catálogo de Bandas
           </h1>
           <p className="text-muted-foreground text-xs mt-0.5">
