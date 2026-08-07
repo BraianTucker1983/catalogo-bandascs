@@ -120,7 +120,7 @@ export default function CatalogoBandas({
       </header>
 
       {/* Estructura Central (Sidebar + Main) */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         
         {/* Sidebar Fijo */}
         <BuscadorSidebar
