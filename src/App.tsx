@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 
-// Importación de componentes principales
 import Header from './components/Header';
 import ListaBandas from './components/ListaBandas';
 import LandingBanda from './components/LandingBanda'; 
@@ -10,23 +9,18 @@ import EditarBanda from './components/EditarBanda';
 import AdminPanel from './components/PanelAdmin'; 
 import Footer from './components/Footer';
 
-// Definición de las vistas posibles en la app
 type Vista = 'catalogo' | 'detalle' | 'formulario' | 'editar' | 'admin';
 
 export default function App() {
-  // Estado de navegación
   const [vista, setVista] = useState<Vista>('catalogo');
   const [bandaId, setBandaId] = useState<string | null>(null);
 
-  // Estado de autenticación
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Estados de diagnóstico de conexión
   const [testCount, setTestCount] = useState<number | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [mostrarDebug, setMostrarDebug] = useState(false);
 
-  // 1. Escuchar la sesión de Supabase en tiempo real
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAdmin(!!session);
@@ -46,7 +40,6 @@ export default function App() {
     };
   }, [vista]);
 
-  // 2. Probar conexión inicial con Supabase
   useEffect(() => {
     async function probarConexion() {
       try {
@@ -64,7 +57,6 @@ export default function App() {
     probarConexion();
   }, []);
 
-  // Handlers de navegación
   const handleSeleccionarBanda = (id: string) => {
     setBandaId(id);
     setVista('detalle');
@@ -72,7 +64,6 @@ export default function App() {
   };
 
   const handleNavegar = (nuevaVista: Vista) => {
-    // Mantener el bandaId si vamos a ver detalle
     if (nuevaVista !== 'detalle' && nuevaVista !== 'editar') {
       setBandaId(null);
     }
@@ -89,14 +80,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-primary selection:text-white relative overflow-x-hidden">
       
-      {/* Glow de fondo decorativo */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-primary/10 blur-[120px] pointer-events-none rounded-full" />
 
-      {/* HEADER INTEGRADO */}
       <Header onNavegar={handleNavegar} vistaActual={vista} />
 
-      
-      {/* Panel de Diagnóstico Colapsable */}
       {mostrarDebug && (
         <div className="bg-yellow-500/10 border-b border-yellow-500/20 py-2 px-6 text-xs font-mono text-yellow-300/90 flex items-center justify-between max-w-6xl mx-auto w-full z-30 my-2">
           <div className="flex items-center gap-4 flex-wrap">
@@ -116,10 +103,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Contenido Principal Dinámico */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 relative z-10">
         
-        {/* Vista 1: Detalle de Banda */}
         {vista === 'detalle' && bandaId && (
           <LandingBanda 
             bandaId={bandaId} 
@@ -127,34 +112,30 @@ export default function App() {
           />
         )}
 
-        {/* Vista 2: Catálogo Principal */}
         {vista === 'catalogo' && (
           <ListaBandas 
             onSeleccionarBanda={handleSeleccionarBanda} 
           />
         )}
 
-        {/* Vista 3: Formulario de Postulación de Banda */}
+        {/* FormBanda actualizado utilizando onVolver */}
         {vista === 'formulario' && (
           <FormBanda 
             onSuccess={() => handleNavegar('catalogo')}
-            onCancel={() => handleNavegar('catalogo')}
+            onVolver={() => handleNavegar('catalogo')}
           />
         )}
 
-        {/* Vista 4: Edición de Perfil con Clave Secreta */}
         {vista === 'editar' && (
           <EditarBanda />
         )}
 
-        {/* Vista 5: Panel de Administración */}
         {vista === 'admin' && (
           <AdminPanel />
         )}
 
       </main>
 
-      {/* Pie de Página */}
       <Footer
         isAdmin={isAdmin}
         onLogout={handleLogout}

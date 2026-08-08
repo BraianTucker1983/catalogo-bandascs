@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 interface FormBandaProps {
-  onCancel?: () => void;
+  onVolver?: () => void;
   onSuccess?: () => void;
 }
 
@@ -34,6 +34,8 @@ interface Integrante {
   rol: string;
   foto_file: File | null;
   foto_preview: string | null;
+  instagram?: string; 
+  facebook?: string;
 }
 
 interface Cancion {
@@ -49,16 +51,15 @@ const GENEROS_DISPONIBLES = [
   'Folk', 'Cumbia', 'Ska', 'Funk', 'Soul', 'R&B'
 ];
 
-// Función para generar un token / palabra clave aleatoria corta y legible
 const generarTokenAleatorio = () => {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 };
 
-export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => {
+export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => {
   // --- ESTADOS BÁSICOS & AUTENTICACIÓN ---
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
-  const [palabraClave, setPalabraClave] = useState(generarTokenAleatorio()); // Visible por defecto
+  const [palabraClave, setPalabraClave] = useState(generarTokenAleatorio());
   const [copiado, setCopiado] = useState(false);
   const [genero, setGenero] = useState<string[]>([]);
   const [bio, setBio] = useState('');
@@ -83,7 +84,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
   const [mensajeEstado, setMensajeEstado] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3>(1);
 
-  // --- GESTIÓN DE MEMORIA (URLs de Previsualización) ---
+  // --- GESTIÓN DE MEMORIA ---
   const activeObjectUrls = useRef<Set<string>>(new Set());
 
   const crearObjectUrl = (file: File): string => {
@@ -106,14 +107,12 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     };
   }, []);
 
-  // Copiar palabra clave al portapapeles
   const copiarClave = () => {
     navigator.clipboard.writeText(palabraClave);
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
   };
 
-  // --- MANEJADORES DE GÉNEROS ---
   const toggleGenero = (g: string) => {
     if (genero.includes(g)) {
       setGenero(genero.filter((item) => item !== g));
@@ -124,7 +123,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     }
   };
 
-  // --- MANEJADOR DE PORTADA ---
   const manejarSeleccionPortada = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -137,7 +135,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     }
   };
 
-  // --- MANEJADORES DE INTEGRANTES ---
   const agregarIntegrante = () => {
     const nuevo: Integrante = {
       id: crypto.randomUUID(),
@@ -145,6 +142,8 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
       rol: '',
       foto_file: null,
       foto_preview: null,
+      instagram: '',
+      facebook: '',
     };
     setIntegrantes([...integrantes, nuevo]);
   };
@@ -175,7 +174,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     setIntegrantes(integrantes.filter((i) => i.id !== id));
   };
 
-  // --- MANEJADORES DE CANCIONES ---
   const agregarCancion = () => {
     const nueva: Cancion = {
       id: crypto.randomUUID(),
@@ -196,7 +194,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     setCanciones(canciones.filter((c) => c.id !== id));
   };
 
-  // --- CONVERSIÓN DE IMAGEN A WEBP ---
   const convertirAWebp = (file: File, maxAncho = 1200, calidad = 0.8): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -245,7 +242,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     });
   };
 
-  // --- ENVÍO DE EMAIL CON TOKEN / PALABRA CLAVE VÍA EMAILJS ---
   const enviarEmailNotificacion = async (nombreBanda: string, emailDestino: string, clave: string) => {
     const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
     const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
@@ -263,7 +259,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         {
           to_email: emailDestino,
           nombre_banda: nombreBanda,
-          clave: clave, // Se envía la clave a la plantilla de EmailJS
+          clave: clave,
           fecha_registro: new Date().toLocaleString('es-AR'),
         },
         publicKey
@@ -273,11 +269,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     }
   };
 
- // --- GUARDAR BANDA ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validaciones iniciales
     if (!nombre.trim()) {
       setMensajeEstado({ tipo: 'error', texto: 'El nombre de la banda es obligatorio.' });
       setPasoActual(1);
@@ -299,12 +293,10 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     setLoading(true);
     setMensajeEstado(null);
 
-    // Normalizamos las variables para uso consistente
     const emailLimpio = email.trim().toLowerCase();
     const claveLimpia = palabraClave.trim(); 
     const nombreLimpio = nombre.trim();
 
-    // 🔍 Pre-verificación: ¿Ya existe una banda con este nombre?
     try {
       const { data: existeBanda } = await supabase
         .from('bandas')
@@ -317,7 +309,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
           tipo: 'error',
           texto: `La banda "${nombreLimpio}" ya se encuentra registrada en el Catálogo. Si eres integrante, utiliza tu palabra clave para modificar sus datos.`,
         });
-        setPasoActual(1); // Regresamos al paso 1
+        setPasoActual(1);
         setLoading(false);
         return;
       }
@@ -329,7 +321,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     const archivosSubidosStorage: string[] = [];
 
     try {
-      // 1. Subir Portada
       let urlPortadaFinal: string | null = null;
       if (portadaFile) {
         const webpBlob = await convertirAWebp(portadaFile, 1200, 0.85);
@@ -350,7 +341,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         urlPortadaFinal = publicUrlData.publicUrl;
       }
 
-      // 2. Insertar Banda guardando email y palabra clave
       const { data: bandaData, error: bandaErr } = await supabase
         .from('bandas')
         .insert([
@@ -372,10 +362,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         .select()
         .single();
 
-      if (bandaErr) throw bandaErr; // Lanzamos el objeto de error directo para evaluar su código en el catch
+      if (bandaErr) throw bandaErr;
       bandaIdCreada = bandaData.id;
 
-      // 3. Insertar Integrantes
       if (integrantes.length > 0) {
         const integrantesParaInsertar = [];
 
@@ -408,6 +397,8 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
             nombre: integrante.nombre.trim(),
             rol: integrante.rol.trim(),
             foto_url: urlFotoIntegrante,
+            instagram: integrante.instagram?.trim() || null,
+            facebook: integrante.facebook?.trim() || null,
           });
         }
 
@@ -420,7 +411,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         }
       }
 
-      // 4. Insertar Canciones
       const cancionesValidas = canciones
         .filter((c) => c.titulo.trim() !== '')
         .map((c) => ({
@@ -438,7 +428,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         if (cancErr) throw new Error(`Error al guardar canciones: ${cancErr.message}`);
       }
 
-      // 5. Enviar Email con la Clave / Token de Edición vía EmailJS
       await enviarEmailNotificacion(nombreLimpio, emailLimpio, claveLimpia);
 
       setMensajeEstado({ 
@@ -453,23 +442,19 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     } catch (err: any) {
       console.error('Error durante el proceso de guardado:', err);
       
-      // Rollback de archivos subidos si ocurre un error
       if (archivosSubidosStorage.length > 0) {
         await supabase.storage.from('Bandas').remove(archivosSubidosStorage);
       }
 
-      // Rollback del registro en la tabla bandas
       if (bandaIdCreada) {
         await supabase.from('bandas').delete().eq('id', bandaIdCreada);
       }
 
-      // --- MENSAJE ELEGANTE PARA DUPLICADOS U OTROS ERRORES ---
       let textoError = err.message || 'Ocurrió un error inesperado. Por favor reintenta.';
 
-      // Verificamos si el error es de unicidad de Supabase / PostgreSQL (Código 23505)
       if (err.code === '23505' || err.message?.includes('bandas_nombre_unique_idx')) {
         textoError = `La banda "${nombreLimpio}" ya se encuentra registrada en el Catálogo. Si eres integrante de esta banda, utiliza tu palabra clave para modificar sus datos.`;
-        setPasoActual(1); // Regresamos al usuario al paso del nombre
+        setPasoActual(1);
       }
 
       setMensajeEstado({
@@ -481,46 +466,57 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
     }
   };
 
-  
   return (
-    <div className="max-w-5xl mx-auto bg-slate-900 text-slate-100 rounded-2xl shadow-2xl overflow-hidden border border-slate-800 my-8">
-      
-      {/* HEADER */}
-      <div 
-        className="relative p-8 transition-all duration-300 bg-cover bg-center"
-        style={{
-          backgroundColor: colorTema,
-          backgroundImage: portadaPreview 
-            ? `linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.95)), url(${portadaPreview})` 
-            : `linear-gradient(to bottom, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.95))`
-        }}
-      >
-        <div className="flex justify-between items-start relative z-10">
-          <div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md text-white mb-3">
-              <Sparkles className="w-3.5 h-3.5" /> Ficha de Banda
-            </span>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
-              {nombre || 'Nombre de tu Banda'}
-            </h1>
-            <p className="text-slate-300 text-sm mt-1 max-w-xl">
-              {genero.length > 0 ? genero.join(' • ') : 'Selecciona hasta 3 géneros principales'}
-            </p>
-          </div>
+  <div className="max-w-5xl mx-auto bg-slate-900 text-slate-100 rounded-2xl shadow-2xl overflow-hidden border border-slate-800 my-8">
 
-          {onCancel && (
-            <button 
-              onClick={onCancel}
-              className="p-2 rounded-full bg-slate-900/50 hover:bg-slate-900/80 text-slate-300 hover:text-white transition-colors backdrop-blur-sm"
-              type="button"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
+    {/* HEADER */}
+    <div 
+      className="relative p-8 transition-all duration-300 bg-cover bg-center"
+      style={{
+        backgroundColor: colorTema,
+        backgroundImage: portadaPreview 
+          ? `linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.95)), url(${portadaPreview})` 
+          : `linear-gradient(to bottom, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.95))`
+      }}
+    >
+      {/* Botón de navegación superior */}
+      {onVolver && (
+        <div className="mb-6 relative z-10 flex justify-between items-center">
+          <button
+            type="button"
+            onClick={onVolver}
+            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-colors bg-slate-900/60 border border-slate-700/80 px-4 py-2 rounded-xl backdrop-blur-md hover:border-indigo-500/50 cursor-pointer shadow-sm"
+          >
+            ← Volver al catálogo
+          </button>
+
+          <button 
+            onClick={onVolver}
+            className="p-2 rounded-full bg-slate-900/50 hover:bg-slate-900/80 text-slate-300 hover:text-white transition-colors backdrop-blur-sm cursor-pointer"
+            type="button"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
+      )}
 
-        {/* NAVEGACIÓN PASOS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8 relative z-10 w-full max-w-full">
+      <div className="flex justify-between items-start relative z-10">
+        <div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md text-white mb-3">
+            <Sparkles className="w-3.5 h-3.5" /> Ficha de Banda
+          </span>
+          <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
+            {nombre || 'Nombre de tu Banda'}
+          </h1>
+          <p className="text-slate-300 text-sm mt-1 max-w-xl">
+            {genero.length > 0 ? genero.join(' • ') : 'Selecciona hasta 3 géneros principales'}
+          </p>
+        </div>
+      </div>
+
+      {/* NAVEGACIÓN PASOS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8 relative z-10 w-full max-w-full">      
+                
           {[
             { id: 1, label: 'Información Básica', icon: Users },
             { id: 2, label: 'Integrantes', icon: Users },
@@ -550,7 +546,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
       {/* FORMULARIO */}
       <form onSubmit={handleSubmit} className="p-8">
         
-        {/* ALERTAS */}
         {mensajeEstado && (
           <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
             mensajeEstado.tipo === 'exito' 
@@ -569,7 +564,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
         {/* PASO 1 */}
         {pasoActual === 1 && (
           <div className="space-y-6 animate-fade-in">
-            {/* Nombre */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Nombre de la Banda <span className="text-rose-500">*</span>
@@ -585,7 +579,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Correo Electrónico <span className="text-rose-500">*</span>
@@ -603,7 +596,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
                 </div>
               </div>
 
-              {/* PALABRA CLAVE VISIBLE / TOKEN */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Palabra Clave / Token de Edición <span className="text-rose-500">*</span>
@@ -618,7 +610,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
                     required
                   />
                   
-                  {/* Botones de acción rápida: Generar y Copiar */}
                   <div className="absolute right-2 flex items-center gap-1">
                     <button
                       type="button"
@@ -645,7 +636,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Color Personalizado */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Color de Marca / Tema
@@ -663,7 +653,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
                 </div>
               </div>
 
-              {/* Bio Corta */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Biografía Corta
@@ -678,7 +667,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
               </div>
             </div>
 
-            {/* Selector de Géneros */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Géneros Musicales (Máx. 3)
@@ -704,7 +692,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
               </div>
             </div>
 
-            {/* Subida de Portada */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Imagen de Portada
@@ -728,7 +715,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
               </div>
             </div>
 
-            {/* Historia Completa */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Historia / Trayectoria
@@ -811,6 +797,35 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onCancel, onSuccess }) => 
                         onChange={(e) => actualizarIntegrante(item.id, 'rol', e.target.value)}
                         className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                            Instagram (opcional)
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://instagram.com/..."
+                            value={item.instagram || ''}
+                            onChange={(e) => actualizarIntegrante(item.id, 'instagram', e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                            Facebook (opcional)
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://facebook.com/..."
+                            value={item.facebook || ''}
+                            onChange={(e) => actualizarIntegrante(item.id, 'facebook', e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 ))}
