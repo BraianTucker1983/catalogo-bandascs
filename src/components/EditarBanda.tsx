@@ -22,6 +22,10 @@ import {
 // --- TIPOS ---
 type Paso = 1 | 2 | 3;
 
+interface EditarBandaProps {
+  onVolver?: () => void;
+}
+
 interface IntegranteInput {
   id?: string | number;
   tempId?: string;
@@ -39,7 +43,7 @@ interface CancionInput {
   youtube_embed_url: string;
 }
 
-export default function EditarBanda() {
+export default function EditarBanda({ onVolver }: EditarBandaProps) {
   // Autenticación por email + palabra clave
   const [emailInput, setEmailInput] = useState('');
   const [palabraClaveInput, setPalabraClaveInput] = useState('');
@@ -457,451 +461,493 @@ export default function EditarBanda() {
   // --- VISTA ACCESO (NO AUTENTICADO) ---
   if (!autenticado) {
     return (
-      <div className="max-w-md mx-auto my-12 bg-slate-900 text-slate-100 p-8 rounded-2xl shadow-2xl border border-slate-800">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center text-xl mx-auto mb-3 border border-indigo-500/20">
-            <Key className="w-6 h-6" />
-          </div>
-          <h3 className="text-2xl font-extrabold text-white">Modificar mi Banda</h3>
-          <p className="text-slate-400 text-sm mt-1">
-            Ingresa tu email y palabra clave para acceder a la edición.
-          </p>
-        </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            cargarDatosBanda(emailInput, palabraClaveInput);
-          }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-indigo-400" /> Correo Electrónico
-            </label>
-            <input
-              type="email"
-              placeholder="tu@email.com"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-indigo-400" /> Palabra Clave
-            </label>
-            <input
-              type="password"
-              placeholder="Tu palabra clave personalizada"
-              value={palabraClaveInput}
-              onChange={(e) => setPalabraClaveInput(e.target.value)}
-              className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={cargando}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-lg font-semibold text-sm transition shadow-lg flex items-center justify-center gap-2 mt-2"
-          >
-            {cargando ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Verificando...
-              </>
-            ) : (
-              'Acceder al Perfil'
-            )}
-          </button>
-        </form>
-
-        {mensaje && (
-          <div className={`mt-4 p-4 rounded-xl flex items-center gap-3 ${
-            mensaje.tipo === 'exito' 
-              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
-              : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
-          }`}>
-            {mensaje.tipo === 'exito' ? (
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-            ) : (
-              <AlertCircle className="w-5 h-5 shrink-0" />
-            )}
-            <p className="text-sm font-medium">{mensaje.texto}</p>
+      <div className="max-w-md mx-auto my-12">
+        
+        {/* Botón de navegación superior fuera de la caja */}
+        {onVolver && (
+          <div className="mb-6 relative z-10 flex items-center">
+            <button
+              type="button"
+              onClick={onVolver}
+              className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-colors bg-slate-900/60 border border-slate-700/80 px-4 py-2 rounded-xl backdrop-blur-md hover:border-indigo-500/50 cursor-pointer shadow-sm"
+            >
+              ← Volver al catálogo
+            </button>
           </div>
         )}
+
+        {/* Contenedor principal de Autenticación */}
+        <div className="bg-slate-900 text-slate-100 p-8 rounded-2xl shadow-2xl border border-slate-800">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center text-xl mx-auto mb-3 border border-indigo-500/20">
+              <Key className="w-6 h-6" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-white">Modificar mi Banda</h3>
+            <p className="text-slate-400 text-sm mt-1">
+              Ingresa tu email y palabra clave para acceder a la edición.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              cargarDatosBanda(emailInput, palabraClaveInput);
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-indigo-400" /> Correo Electrónico
+              </label>
+              <input
+                type="email"
+                placeholder="tu@email.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-indigo-400" /> Palabra Clave
+              </label>
+              <input
+                type="password"
+                placeholder="Tu palabra clave personalizada"
+                value={palabraClaveInput}
+                onChange={(e) => setPalabraClaveInput(e.target.value)}
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={cargando}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-lg font-semibold text-sm transition shadow-lg flex items-center justify-center gap-2 mt-2"
+            >
+              {cargando ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Verificando...
+                </>
+              ) : (
+                'Acceder al Perfil'
+              )}
+            </button>
+          </form>
+
+          {mensaje && (
+            <div className={`mt-4 p-4 rounded-xl flex items-center gap-3 ${
+              mensaje.tipo === 'exito' 
+                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
+                : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+            }`}>
+              {mensaje.tipo === 'exito' ? (
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 shrink-0" />
+              )}
+              <p className="text-sm font-medium">{mensaje.texto}</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
   // --- VISTA PANEL EDICIÓN (AUTENTICADO) ---
   return (
-    <div className="max-w-5xl mx-auto bg-slate-900 text-slate-100 rounded-2xl shadow-2xl overflow-hidden border border-slate-800 my-8">
+    <div className="max-w-5xl mx-auto my-8">
       
-      {/* HEADER DINÁMICO */}
-      <div 
-        className="relative p-8 transition-all duration-300 bg-cover bg-center"
-        style={{
-          backgroundColor: colorTema,
-          backgroundImage: portadaPreviewUrl 
-            ? `linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.95)), url(${portadaPreviewUrl})` 
-            : `linear-gradient(to bottom, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.95))`
-        }}
-      >
-        <div className="flex justify-between items-start relative z-10">
-          <div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md text-white mb-3">
-              <Sparkles className="w-3.5 h-3.5" /> Edición de Perfil
-            </span>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
-              {nombre || 'Mi Banda'}
-            </h1>
-            <p className="text-slate-300 text-sm mt-1 max-w-xl">
-              {genero ? genero : 'Personaliza la información de tu banda'}
-            </p>
-          </div>
-        </div>
+      {/* Botón de navegación superior (visible también cuando estás logueado) */}
+      {onVolver && (
+        <div className="mb-6 relative z-10 flex justify-between items-center px-2">
+          <button
+            type="button"
+            onClick={onVolver}
+            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-colors bg-slate-900/60 border border-slate-700/80 px-4 py-2 rounded-xl backdrop-blur-md hover:border-indigo-500/50 cursor-pointer shadow-sm"
+          >
+            ← Volver al catálogo
+          </button>
 
-        {/* NAVEGACIÓN PASOS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8 relative z-10 w-full max-w-full">
-          {[
-            { id: 1, label: 'Información Básica', icon: Users },
-            { id: 2, label: 'Integrantes', icon: Users },
-            { id: 3, label: 'Música y Links', icon: Music },
-          ].map((paso) => {
-            const Icon = paso.icon;
-            const activo = pasoActual === paso.id;
-            return (
-              <button
-                key={paso.id}
-                type="button"
-                onClick={() => setPasoActual(paso.id as Paso)}
-                className={`flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 rounded-lg text-xs sm:text-sm transition-all text-center ${
-                  activo 
-                    ? 'bg-white text-slate-900 shadow-lg font-bold' 
-                    : 'bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200 backdrop-blur-sm'
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="truncate">{paso.label}</span>
-              </button>
-            );
-          })}
+          <button 
+            onClick={onVolver}
+            className="p-2 rounded-full bg-slate-900/50 hover:bg-slate-900/80 text-slate-300 hover:text-white transition-colors backdrop-blur-sm cursor-pointer"
+            type="button"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* FORMULARIO DE EDICIÓN */}
-      <form onSubmit={handleGuardarCambios} className="p-8">
+      {/* CONTENEDOR PRINCIPAL DEL FORMULARIO */}
+      <div className="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
         
-        {/* MENSAJES DE ESTADO */}
-        {mensaje && (
-          <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
-            mensaje.tipo === 'exito' 
-              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
-              : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
-          }`}>
-            {mensaje.tipo === 'exito' ? (
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-            ) : (
-              <AlertCircle className="w-5 h-5 shrink-0" />
-            )}
-            <p className="text-sm font-medium">{mensaje.texto}</p>
+        {/* HEADER DINÁMICO */}
+        <div 
+          className="relative p-8 transition-all duration-300 bg-cover bg-center"
+          style={{
+            backgroundColor: colorTema,
+            backgroundImage: portadaPreviewUrl 
+              ? `linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.95)), url(${portadaPreviewUrl})` 
+              : `linear-gradient(to bottom, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.95))`
+          }}
+        >
+          <div className="flex justify-between items-start relative z-10">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md text-white mb-3">
+                <Sparkles className="w-3.5 h-3.5" /> Edición de Perfil
+              </span>
+              <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
+                {nombre || 'Mi Banda'}
+              </h1>
+              <p className="text-slate-300 text-sm mt-1 max-w-xl">
+                {genero ? genero : 'Personaliza la información de tu banda'}
+              </p>
+            </div>
           </div>
-        )}
 
-        {/* PASO 1: INFORMACIÓN BÁSICA Y PORTADA */}
-        {pasoActual === 1 && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Nombre de la Banda <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                  required
-                />
-              </div>
+          {/* NAVEGACIÓN PASOS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8 relative z-10 w-full max-w-full">
+            {[
+              { id: 1, label: 'Información Básica', icon: Users },
+              { id: 2, label: 'Integrantes', icon: Users },
+              { id: 3, label: 'Música y Links', icon: Music },
+            ].map((paso) => {
+              const Icon = paso.icon;
+              const activo = pasoActual === paso.id;
+              return (
+                <button
+                  key={paso.id}
+                  type="button"
+                  onClick={() => setPasoActual(paso.id as Paso)}
+                  className={`flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 rounded-lg text-xs sm:text-sm transition-all text-center ${
+                    activo 
+                      ? 'bg-white text-slate-900 shadow-lg font-bold' 
+                      : 'bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200 backdrop-blur-sm'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{paso.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Género Musical
-                </label>
-                <input
-                  type="text"
-                  value={genero}
-                  onChange={(e) => setGenero(e.target.value)}
-                  placeholder="Ej: Rock, Pop, Metal..."
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                  required
-                />
-              </div>
+        {/* FORMULARIO DE EDICIÓN */}
+        <form onSubmit={handleGuardarCambios} className="p-8">
+          
+          {/* MENSAJES DE ESTADO */}
+          {mensaje && (
+            <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
+              mensaje.tipo === 'exito' 
+                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
+                : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+            }`}>
+              {mensaje.tipo === 'exito' ? (
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 shrink-0" />
+              )}
+              <p className="text-sm font-medium">{mensaje.texto}</p>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Color de Marca / Tema
-              </label>
-              <div className="flex gap-3 items-center">
-                <input
-                  type="color"
-                  value={colorTema}
-                  onChange={(e) => setColorTema(e.target.value)}
-                  className="h-10 w-20 bg-slate-800 border border-slate-700 rounded cursor-pointer"
-                />
-                <span className="text-xs text-slate-400">
-                  Ajusta el color que identificará tu ficha en la plataforma.
-                </span>
-              </div>
-            </div>
-
-            {/* Subida y Previsualización de Portada */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Imagen de Portada
-              </label>
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-800/30 hover:bg-slate-800/60 transition group">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-2 text-slate-500 group-hover:text-indigo-400 transition" />
-                      <p className="text-xs text-slate-400">
-                        <span className="font-semibold text-slate-300">Haz clic para cambiar imagen</span> o arrastra y suelta
-                      </p>
-                      <p className="text-[10px] text-slate-500 mt-1">PNG, JPG o WEBP (Se optimizará automáticamente)</p>
-                    </div>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={manejarSeleccionPortada} 
-                      className="hidden" 
-                    />
+          {/* PASO 1: INFORMACIÓN BÁSICA Y PORTADA */}
+          {pasoActual === 1 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Nombre de la Banda <span className="text-rose-500">*</span>
                   </label>
+                  <input
+                    type="text"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                    required
+                  />
                 </div>
 
-                {portadaPreviewUrl && (
-                  <div className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-700/60">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={portadaPreviewUrl}
-                        alt="Portada"
-                        className="w-16 h-12 object-cover rounded-lg border border-slate-700"
-                      />
-                      <span className="text-xs text-slate-300">Imagen de portada seleccionada</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={eliminarPortada}
-                      className="p-2 text-slate-400 hover:text-rose-400 transition"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Género Musical
+                  </label>
+                  <input
+                    type="text"
+                    value={genero}
+                    onChange={(e) => setGenero(e.target.value)}
+                    placeholder="Ej: Rock, Pop, Metal..."
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                    required
+                  />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Biografía / Historia
-              </label>
-              <textarea
-                rows={4}
-                value={historia}
-                onChange={(e) => setHistoria(e.target.value)}
-                placeholder="Cuenta la trayectoria, discos, novedades..."
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* PASO 2: INTEGRANTES */}
-        {pasoActual === 2 && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-slate-200">Miembros de la Banda</h3>
-                <p className="text-xs text-slate-400">Gestiona la formación actual</p>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Color de Marca / Tema
+                </label>
+                <div className="flex gap-3 items-center">
+                  <input
+                    type="color"
+                    value={colorTema}
+                    onChange={(e) => setColorTema(e.target.value)}
+                    className="h-10 w-20 bg-slate-800 border border-slate-700 rounded cursor-pointer"
+                  />
+                  <span className="text-xs text-slate-400">
+                    Ajusta el color que identificará tu ficha en la plataforma.
+                  </span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIntegrantes([...integrantes, { tempId: crypto.randomUUID(), nombre: '', instrumento: '', foto: null, fotoPreviewUrl: null }])}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow"
-              >
-                <Plus className="w-4 h-4" /> Agregar Miembro
-              </button>
-            </div>
 
-            {integrantes.length === 0 ? (
-              <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-800">
-                <Users className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm">No has añadido integrantes todavía.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {integrantes.map((int, index) => (
-                  <div key={int.id || int.tempId} className="p-4 bg-slate-800/40 border border-slate-700/60 rounded-xl flex gap-4 items-start relative group">
-                    <button
-                      type="button"
-                      onClick={() => eliminarIntegrante(index)}
-                      className="absolute top-3 right-3 text-slate-500 hover:text-rose-400 transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-
-                    <label className="relative w-16 h-16 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden border border-slate-600 group-hover:border-indigo-500 transition">
-                      {int.fotoPreviewUrl ? (
-                        <img src={int.fotoPreviewUrl} alt="Integrante" className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageIcon className="w-6 h-6 text-slate-400" />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => manejarFotoIntegrante(index, e)}
+              {/* Subida y Previsualización de Portada */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Imagen de Portada
+                </label>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-center w-full">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-800/30 hover:bg-slate-800/60 transition group">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className="w-8 h-8 mb-2 text-slate-500 group-hover:text-indigo-400 transition" />
+                        <p className="text-xs text-slate-400">
+                          <span className="font-semibold text-slate-300">Haz clic para cambiar imagen</span> o arrastra y suelta
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-1">PNG, JPG o WEBP (Se optimizará automáticamente)</p>
+                      </div>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={manejarSeleccionPortada} 
+                        className="hidden" 
                       />
                     </label>
-
-                    <div className="flex-1 space-y-2 pr-6">
-                      <input
-                        type="text"
-                        placeholder="Nombre del integrante"
-                        value={int.nombre}
-                        onChange={(e) => actualizarIntegrante(index, 'nombre', e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Instrumento / Rol"
-                        value={int.instrumento}
-                        onChange={(e) => actualizarIntegrante(index, 'instrumento', e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
-                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* PASO 3: CANCIONES Y MULTIMEDIA */}
-        {pasoActual === 3 && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-200">Canciones y Enlaces</h3>
-                <p className="text-xs text-slate-400">Enlaza tus temas o reproductores</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCanciones([...canciones, { tempId: crypto.randomUUID(), titulo: '', spotify_embed_url: '', youtube_embed_url: '' }])}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow"
-              >
-                <Plus className="w-4 h-4" /> Añadir Canción
-              </button>
-            </div>
-
-            {canciones.length === 0 ? (
-              <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-800">
-                <Disc className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm">No has agregado canciones en la lista.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {canciones.map((can, index) => (
-                  <div key={can.id || can.tempId} className="p-4 bg-slate-800/40 border border-slate-700/60 rounded-xl space-y-3 relative">
-                    <div className="flex justify-between items-center gap-3">
-                      <input
-                        type="text"
-                        placeholder="Título de la canción"
-                        value={can.titulo}
-                        onChange={(e) => actualizarCancion(index, 'titulo', e.target.value)}
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
+                  {portadaPreviewUrl && (
+                    <div className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-700/60">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={portadaPreviewUrl}
+                          alt="Portada"
+                          className="w-16 h-12 object-cover rounded-lg border border-slate-700"
+                        />
+                        <span className="text-xs text-slate-300">Imagen de portada seleccionada</span>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => eliminarCancion(index)}
-                        className="p-2 text-slate-500 hover:text-rose-400 transition"
+                        onClick={eliminarPortada}
+                        className="p-2 text-slate-400 hover:text-rose-400 transition"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Biografía / Historia
+                </label>
+                <textarea
+                  rows={4}
+                  value={historia}
+                  onChange={(e) => setHistoria(e.target.value)}
+                  placeholder="Cuenta la trayectoria, discos, novedades..."
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* PASO 2: INTEGRANTES */}
+          {pasoActual === 2 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-200">Miembros de la Banda</h3>
+                  <p className="text-xs text-slate-400">Gestiona la formación actual</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIntegrantes([...integrantes, { tempId: crypto.randomUUID(), nombre: '', instrumento: '', foto: null, fotoPreviewUrl: null }])}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow"
+                >
+                  <Plus className="w-4 h-4" /> Agregar Miembro
+                </button>
+              </div>
+
+              {integrantes.length === 0 ? (
+                <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-800">
+                  <Users className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">No has añadido integrantes todavía.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {integrantes.map((int, index) => (
+                    <div key={int.id || int.tempId} className="p-4 bg-slate-800/40 border border-slate-700/60 rounded-xl flex gap-4 items-start relative group">
+                      <button
+                        type="button"
+                        onClick={() => eliminarIntegrante(index)}
+                        className="absolute top-3 right-3 text-slate-500 hover:text-rose-400 transition"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        placeholder="Embed / Link de Spotify"
-                        value={can.spotify_embed_url}
-                        onChange={(e) => actualizarCancion(index, 'spotify_embed_url', e.target.value)}
-                        className="w-full bg-slate-800/80 border border-slate-700/80 rounded px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Embed / Link de YouTube"
-                        value={can.youtube_embed_url}
-                        onChange={(e) => actualizarCancion(index, 'youtube_embed_url', e.target.value)}
-                        className="w-full bg-slate-800/80 border border-slate-700/80 rounded px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
+                      <label className="relative w-16 h-16 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden border border-slate-600 group-hover:border-indigo-500 transition">
+                        {int.fotoPreviewUrl ? (
+                          <img src={int.fotoPreviewUrl} alt="Integrante" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-6 h-6 text-slate-400" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => manejarFotoIntegrante(index, e)}
+                        />
+                      </label>
+
+                      <div className="flex-1 space-y-2 pr-6">
+                        <input
+                          type="text"
+                          placeholder="Nombre del integrante"
+                          value={int.nombre}
+                          onChange={(e) => actualizarIntegrante(index, 'nombre', e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Instrumento / Rol"
+                          value={int.instrumento}
+                          onChange={(e) => actualizarIntegrante(index, 'instrumento', e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PASO 3: CANCIONES Y MULTIMEDIA */}
+          {pasoActual === 3 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-200">Canciones y Enlaces</h3>
+                  <p className="text-xs text-slate-400">Enlaza tus temas o reproductores</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCanciones([...canciones, { tempId: crypto.randomUUID(), titulo: '', spotify_embed_url: '', youtube_embed_url: '' }])}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow"
+                >
+                  <Plus className="w-4 h-4" /> Añadir Canción
+                </button>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* ACCIONES DE BOTONES INFERIORES */}
-        <div className="mt-8 pt-6 border-t border-slate-800 flex justify-between items-center">
-          <div>
-            {pasoActual > 1 && (
-              <button
-                type="button"
-                onClick={() => setPasoActual((pasoActual - 1) as Paso)}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition"
-              >
-                <ArrowLeft className="w-4 h-4" /> Anterior
-              </button>
-            )}
+              {canciones.length === 0 ? (
+                <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-800">
+                  <Disc className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">No has agregado canciones en la lista.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {canciones.map((can, index) => (
+                    <div key={can.id || can.tempId} className="p-4 bg-slate-800/40 border border-slate-700/60 rounded-xl space-y-3 relative">
+                      <div className="flex justify-between items-center gap-3">
+                        <input
+                          type="text"
+                          placeholder="Título de la canción"
+                          value={can.titulo}
+                          onChange={(e) => actualizarCancion(index, 'titulo', e.target.value)}
+                          className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => eliminarCancion(index)}
+                          className="p-2 text-slate-500 hover:text-rose-400 transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder="Embed / Link de Spotify"
+                          value={can.spotify_embed_url}
+                          onChange={(e) => actualizarCancion(index, 'spotify_embed_url', e.target.value)}
+                          className="w-full bg-slate-800/80 border border-slate-700/80 rounded px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Embed / Link de YouTube"
+                          value={can.youtube_embed_url}
+                          onChange={(e) => actualizarCancion(index, 'youtube_embed_url', e.target.value)}
+                          className="w-full bg-slate-800/80 border border-slate-700/80 rounded px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ACCIONES DE BOTONES INFERIORES */}
+          <div className="mt-8 pt-6 border-t border-slate-800 flex justify-between items-center">
+            <div>
+              {pasoActual > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setPasoActual((pasoActual - 1) as Paso)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Anterior
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              {pasoActual < 3 ? (
+                <button
+                  type="button"
+                  onClick={() => setPasoActual((pasoActual + 1) as Paso)}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow-lg"
+                >
+                  Siguiente
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={cargando}
+                  className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white rounded-lg text-sm font-semibold transition shadow-lg disabled:cursor-not-allowed"
+                >
+                  {cargando ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" /> Guardar Cambios
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex gap-3">
-            {pasoActual < 3 ? (
-              <button
-                type="button"
-                onClick={() => setPasoActual((pasoActual + 1) as Paso)}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow-lg"
-              >
-                Siguiente
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={cargando}
-                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white rounded-lg text-sm font-semibold transition shadow-lg disabled:cursor-not-allowed"
-              >
-                {cargando ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" /> Guardar Cambios
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-
-      </form>
+        </form>
+      </div>
     </div>
   );
-}
+};

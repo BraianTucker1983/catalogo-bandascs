@@ -481,21 +481,13 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
     >
       {/* Botón de navegación superior */}
       {onVolver && (
-        <div className="mb-6 relative z-10 flex justify-between items-center">
+        <div className="mb-6 relative z-10 flex items-center">
           <button
             type="button"
             onClick={onVolver}
             className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-colors bg-slate-900/60 border border-slate-700/80 px-4 py-2 rounded-xl backdrop-blur-md hover:border-indigo-500/50 cursor-pointer shadow-sm"
           >
             ← Volver al catálogo
-          </button>
-
-          <button 
-            onClick={onVolver}
-            className="p-2 rounded-full bg-slate-900/50 hover:bg-slate-900/80 text-slate-300 hover:text-white transition-colors backdrop-blur-sm cursor-pointer"
-            type="button"
-          >
-            <X className="w-5 h-5" />
           </button>
         </div>
       )}

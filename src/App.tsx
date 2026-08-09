@@ -127,7 +127,7 @@ export default function App() {
         )}
 
         {vista === 'editar' && (
-          <EditarBanda />
+          <EditarBanda onVolver={() => handleNavegar('catalogo')} />
         )}
 
         {vista === 'admin' && (
