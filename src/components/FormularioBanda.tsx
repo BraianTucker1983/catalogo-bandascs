@@ -20,12 +20,14 @@ import {
   Key,
   RefreshCw,
   Copy,
-  Check
+  Check,
+  Search
 } from 'lucide-react';
 
 interface FormBandaProps {
   onVolver?: () => void;
   onSuccess?: () => void;
+  palabraClaveEdicion?: string; // Permite pasar una clave inicial si se ingresa desde otra pantalla
 }
 
 interface Integrante {
@@ -55,7 +57,12 @@ const generarTokenAleatorio = () => {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 };
 
-export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => {
+export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palabraClaveEdicion }) => {
+  // --- ESTADO DE EDICIÓN ---
+  const [esModoEdicion, setEsModoEdicion] = useState(false);
+  const [bandaId, setBandaId] = useState<string | null>(null);
+  const [cargandoDatos, setCargandoDatos] = useState(false);
+
   // --- ESTADOS BÁSICOS & AUTENTICACIÓN ---
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
@@ -107,6 +114,105 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
     };
   }, []);
 
+  // --- FUNCIÓN DE CARGA DE BANDA POR PALABRA CLAVE ---
+  const cargarBandaPorClave = async (claveABuscar: string) => {
+    if (!claveABuscar.trim()) {
+      setMensajeEstado({ tipo: 'error', texto: 'Ingresa una palabra clave válida.' });
+      return;
+    }
+
+    setCargandoDatos(true);
+    setMensajeEstado(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('bandas')
+        .select('*, integrantes(*), canciones(*)')
+        .eq('palabra_clave', claveABuscar.trim())
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        setMensajeEstado({
+          tipo: 'error',
+          texto: 'No se encontró ninguna banda registrada con esa palabra clave.',
+        });
+        return;
+      }
+
+      // 1. Cargar datos base de la banda
+      setBandaId(data.id);
+      setEsModoEdicion(true);
+      setNombre(data.nombre || '');
+      setEmail(data.email || '');
+      setPalabraClave(data.palabra_clave || claveABuscar);
+      setBio(data.bio || '');
+      setHistoria(data.historia || '');
+      setColorTema(data.color_tema || '#6366f1');
+      setSpotifyUrl(data.spotify_url || '');
+      setInstagramUrl(data.instagram_url || '');
+      setYoutubeUrl(data.youtube_url || '');
+      setPortadaPreview(data.url_portada || null);
+
+      // 2. Formatear géneros ("Rock, Pop" -> ['Rock', 'Pop'])
+      if (data.genero) {
+        setGenero(data.genero.split(', ').map((g: string) => g.trim()).filter(Boolean));
+      } else {
+        setGenero([]);
+      }
+
+      // 3. Formatear integrantes (mapeando foto_url a foto_preview)
+      if (data.integrantes && Array.isArray(data.integrantes)) {
+        const ints: Integrante[] = data.integrantes.map((i: any) => ({
+          id: i.id || crypto.randomUUID(),
+          nombre: i.nombre || '',
+          rol: i.rol || '',
+          foto_file: null,
+          foto_preview: i.foto_url || null, // Mapeo clave para visualizar foto existente
+          instagram: i.instagram || '',
+          facebook: i.facebook || '',
+        }));
+        setIntegrantes(ints);
+      } else {
+        setIntegrantes([]);
+      }
+
+      // 4. Formatear canciones
+      if (data.canciones && Array.isArray(data.canciones)) {
+        const canc: Cancion[] = data.canciones.map((c: any) => ({
+          id: c.id || crypto.randomUUID(),
+          titulo: c.titulo || '',
+          url_audio: c.url_audio || '',
+          spotify_id: c.spotify_id || '',
+        }));
+        setCanciones(canc);
+      } else {
+        setCanciones([]);
+      }
+
+      setMensajeEstado({
+        tipo: 'exito',
+        texto: `¡Datos de "${data.nombre}" cargados en modo edición! Modifica los campos que desees.`,
+      });
+
+    } catch (err: any) {
+      console.error('Error al cargar datos de la banda:', err);
+      setMensajeEstado({
+        tipo: 'error',
+        texto: 'Ocurrió un error al consultar la palabra clave.',
+      });
+    } finally {
+      setCargandoDatos(false);
+    }
+  };
+
+  useEffect(() => {
+    if (palabraClaveEdicion) {
+      cargarBandaPorClave(palabraClaveEdicion);
+    }
+  }, [palabraClaveEdicion]);
+
   const copiarClave = () => {
     navigator.clipboard.writeText(palabraClave);
     setCopiado(true);
@@ -126,7 +232,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
   const manejarSeleccionPortada = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (portadaPreview) {
+      if (portadaPreview && !portadaPreview.startsWith('http')) {
         revocarObjectUrl(portadaPreview);
       }
       const newPreviewUrl = crearObjectUrl(file);
@@ -153,7 +259,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
       integrantes.map((item) => {
         if (item.id === id) {
           if (campo === 'foto_file' && valor instanceof File) {
-            if (item.foto_preview) {
+            if (item.foto_preview && !item.foto_preview.startsWith('http')) {
               revocarObjectUrl(item.foto_preview);
             }
             const previewUrl = crearObjectUrl(valor);
@@ -168,7 +274,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
 
   const eliminarIntegrante = (id: string) => {
     const integrante = integrantes.find((i) => i.id === id);
-    if (integrante?.foto_preview) {
+    if (integrante?.foto_preview && !integrante.foto_preview.startsWith('http')) {
       revocarObjectUrl(integrante.foto_preview);
     }
     setIntegrantes(integrantes.filter((i) => i.id !== id));
@@ -297,31 +403,12 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
     const claveLimpia = palabraClave.trim(); 
     const nombreLimpio = nombre.trim();
 
-    try {
-      const { data: existeBanda } = await supabase
-        .from('bandas')
-        .select('id')
-        .ilike('nombre', nombreLimpio)
-        .maybeSingle();
-
-      if (existeBanda) {
-        setMensajeEstado({
-          tipo: 'error',
-          texto: `La banda "${nombreLimpio}" ya se encuentra registrada en el Catálogo. Si eres integrante, utiliza tu palabra clave para modificar sus datos.`,
-        });
-        setPasoActual(1);
-        setLoading(false);
-        return;
-      }
-    } catch (checkErr) {
-      console.warn('No se pudo verificar el nombre previamente:', checkErr);
-    }
-
-    let bandaIdCreada: string | null = null;
     const archivosSubidosStorage: string[] = [];
 
     try {
-      let urlPortadaFinal: string | null = null;
+      // 1. Manejo de la Portada (Mantiene la previa si no se subió un nuevo archivo)
+      let urlPortadaFinal: string | null = portadaPreview; 
+
       if (portadaFile) {
         const webpBlob = await convertirAWebp(portadaFile, 1200, 0.85);
         const fileName = `portadas/${crypto.randomUUID()}.webp`;
@@ -341,10 +428,11 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
         urlPortadaFinal = publicUrlData.publicUrl;
       }
 
-      const { data: bandaData, error: bandaErr } = await supabase
-        .from('bandas')
-        .insert([
-          {
+      if (esModoEdicion && bandaId) {
+        // --- PROCESO DE ACTUALIZACIÓN (MODO EDICIÓN) ---
+        const { error: updateErr } = await supabase
+          .from('bandas')
+          .update({
             nombre: nombreLimpio,
             email: emailLimpio,
             palabra_clave: claveLimpia,
@@ -356,104 +444,218 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
             spotify_url: spotifyUrl.trim(),
             instagram_url: instagramUrl.trim(),
             youtube_url: youtubeUrl.trim(),
-            aprobado: false
-          },
-        ])
-        .select()
-        .single();
+          })
+          .eq('id', bandaId);
 
-      if (bandaErr) throw bandaErr;
-      bandaIdCreada = bandaData.id;
+        if (updateErr) throw updateErr;
 
-      if (integrantes.length > 0) {
-        const integrantesParaInsertar = [];
+        // Actualizar integrantes: Eliminar previos y reinsertar actualizados
+        const { error: deleteIntErr } = await supabase
+          .from('integrantes')
+          .delete()
+          .eq('banda_id', bandaId);
 
-        for (const integrante of integrantes) {
-          if (!integrante.nombre.trim()) continue;
+        if (deleteIntErr) throw new Error(`Error al actualizar integrantes: ${deleteIntErr.message}`);
 
-          let urlFotoIntegrante: string | null = null;
+        if (integrantes.length > 0) {
+          const integrantesParaInsertar = [];
 
-          if (integrante.foto_file) {
-            const webpBlob = await convertirAWebp(integrante.foto_file, 600, 0.8);
-            const fileName = `integrantes/${crypto.randomUUID()}.webp`;
+          for (const integrante of integrantes) {
+            if (!integrante.nombre.trim()) continue;
 
-            const { error: uploadIntErr } = await supabase.storage
-              .from('Bandas')
-              .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
+            let urlFotoIntegrante: string | null = integrante.foto_preview;
 
-            if (uploadIntErr) throw new Error(`Error al subir la foto de ${integrante.nombre}`);
-            
-            archivosSubidosStorage.push(fileName);
+            if (integrante.foto_file) {
+              const webpBlob = await convertirAWebp(integrante.foto_file, 600, 0.8);
+              const fileName = `integrantes/${crypto.randomUUID()}.webp`;
 
-            const { data: publicUrlData } = supabase.storage
-              .from('Bandas')
-              .getPublicUrl(fileName);
+              const { error: uploadIntErr } = await supabase.storage
+                .from('Bandas')
+                .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
-            urlFotoIntegrante = publicUrlData.publicUrl;
+              if (uploadIntErr) throw new Error(`Error al subir foto de ${integrante.nombre}`);
+              
+              archivosSubidosStorage.push(fileName);
+
+              const { data: publicUrlData } = supabase.storage
+                .from('Bandas')
+                .getPublicUrl(fileName);
+
+              urlFotoIntegrante = publicUrlData.publicUrl;
+            }
+
+            integrantesParaInsertar.push({
+              banda_id: bandaId,
+              nombre: integrante.nombre.trim(),
+              rol: integrante.rol.trim(),
+              foto_url: urlFotoIntegrante,
+              instagram: integrante.instagram?.trim() || null,
+              facebook: integrante.facebook?.trim() || null,
+            });
           }
 
-          integrantesParaInsertar.push({
-            banda_id: bandaIdCreada,
-            nombre: integrante.nombre.trim(),
-            rol: integrante.rol.trim(),
-            foto_url: urlFotoIntegrante,
-            instagram: integrante.instagram?.trim() || null,
-            facebook: integrante.facebook?.trim() || null,
-          });
+          if (integrantesParaInsertar.length > 0) {
+            const { error: intInsertErr } = await supabase
+              .from('integrantes')
+              .insert(integrantesParaInsertar);
+
+            if (intInsertErr) throw new Error(`Error al guardar integrantes: ${intInsertErr.message}`);
+          }
         }
 
-        if (integrantesParaInsertar.length > 0) {
-          const { error: intInsertErr } = await supabase
-            .from('integrantes')
-            .insert(integrantesParaInsertar);
-
-          if (intInsertErr) throw new Error(`Error al guardar integrantes: ${intInsertErr.message}`);
-        }
-      }
-
-      const cancionesValidas = canciones
-        .filter((c) => c.titulo.trim() !== '')
-        .map((c) => ({
-          banda_id: bandaIdCreada,
-          titulo: c.titulo.trim(),
-          url_audio: c.url_audio.trim(),
-          spotify_id: c.spotify_id.trim(),
-        }));
-
-      if (cancionesValidas.length > 0) {
-        const { error: cancErr } = await supabase
+        // Actualizar canciones: Eliminar previas y reinsertar actualizadas
+        const { error: deleteCancErr } = await supabase
           .from('canciones')
-          .insert(cancionesValidas);
+          .delete()
+          .eq('banda_id', bandaId);
 
-        if (cancErr) throw new Error(`Error al guardar canciones: ${cancErr.message}`);
+        if (deleteCancErr) throw new Error(`Error al actualizar canciones: ${deleteCancErr.message}`);
+
+        const cancionesValidas = canciones
+          .filter((c) => c.titulo.trim() !== '')
+          .map((c) => ({
+            banda_id: bandaId,
+            titulo: c.titulo.trim(),
+            url_audio: c.url_audio.trim(),
+            spotify_id: c.spotify_id.trim(),
+          }));
+
+        if (cancionesValidas.length > 0) {
+          const { error: cancErr } = await supabase
+            .from('canciones')
+            .insert(cancionesValidas);
+
+          if (cancErr) throw new Error(`Error al guardar canciones: ${cancErr.message}`);
+        }
+
+        setMensajeEstado({ 
+          tipo: 'exito', 
+          texto: `¡Información de "${nombreLimpio}" actualizada exitosamente!` 
+        });
+
+      } else {
+        // --- PROCESO DE REGISTRO NUEVO (MODO CREACIÓN) ---
+        const { data: existeBanda } = await supabase
+          .from('bandas')
+          .select('id')
+          .ilike('nombre', nombreLimpio)
+          .maybeSingle();
+
+        if (existeBanda) {
+          setMensajeEstado({
+            tipo: 'error',
+            texto: `La banda "${nombreLimpio}" ya se encuentra registrada en el Catálogo. Si eres integrante, utiliza tu palabra clave para modificar sus datos.`,
+          });
+          setPasoActual(1);
+          setLoading(false);
+          return;
+        }
+
+        const { data: bandaData, error: bandaErr } = await supabase
+          .from('bandas')
+          .insert([
+            {
+              nombre: nombreLimpio,
+              email: emailLimpio,
+              palabra_clave: claveLimpia,
+              genero: genero.join(', '),
+              bio: bio.trim(),
+              historia: historia.trim(),
+              color_tema: colorTema,
+              url_portada: urlPortadaFinal,
+              spotify_url: spotifyUrl.trim(),
+              instagram_url: instagramUrl.trim(),
+              youtube_url: youtubeUrl.trim(),
+              aprobado: false
+            },
+          ])
+          .select()
+          .single();
+
+        if (bandaErr) throw bandaErr;
+        const bandaIdCreada = bandaData.id;
+
+        if (integrantes.length > 0) {
+          const integrantesParaInsertar = [];
+
+          for (const integrante of integrantes) {
+            if (!integrante.nombre.trim()) continue;
+
+            let urlFotoIntegrante: string | null = null;
+
+            if (integrante.foto_file) {
+              const webpBlob = await convertirAWebp(integrante.foto_file, 600, 0.8);
+              const fileName = `integrantes/${crypto.randomUUID()}.webp`;
+
+              const { error: uploadIntErr } = await supabase.storage
+                .from('Bandas')
+                .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
+
+              if (uploadIntErr) throw new Error(`Error al subir la foto de ${integrante.nombre}`);
+              
+              archivosSubidosStorage.push(fileName);
+
+              const { data: publicUrlData } = supabase.storage
+                .from('Bandas')
+                .getPublicUrl(fileName);
+
+              urlFotoIntegrante = publicUrlData.publicUrl;
+            }
+
+            integrantesParaInsertar.push({
+              banda_id: bandaIdCreada,
+              nombre: integrante.nombre.trim(),
+              rol: integrante.rol.trim(),
+              foto_url: urlFotoIntegrante,
+              instagram: integrante.instagram?.trim() || null,
+              facebook: integrante.facebook?.trim() || null,
+            });
+          }
+
+          if (integrantesParaInsertar.length > 0) {
+            const { error: intInsertErr } = await supabase
+              .from('integrantes')
+              .insert(integrantesParaInsertar);
+
+            if (intInsertErr) throw new Error(`Error al guardar integrantes: ${intInsertErr.message}`);
+          }
+        }
+
+        const cancionesValidas = canciones
+          .filter((c) => c.titulo.trim() !== '')
+          .map((c) => ({
+            banda_id: bandaIdCreada,
+            titulo: c.titulo.trim(),
+            url_audio: c.url_audio.trim(),
+            spotify_id: c.spotify_id.trim(),
+          }));
+
+        if (cancionesValidas.length > 0) {
+          const { error: cancErr } = await supabase
+            .from('canciones')
+            .insert(cancionesValidas);
+
+          if (cancErr) throw new Error(`Error al guardar canciones: ${cancErr.message}`);
+        }
+
+        await enviarEmailNotificacion(nombreLimpio, emailLimpio, claveLimpia);
+
+        setMensajeEstado({ 
+          tipo: 'exito', 
+          texto: `¡Banda registrada con éxito! Te enviamos tu palabra clave (${claveLimpia}) al correo guardado.` 
+        });
       }
 
-      await enviarEmailNotificacion(nombreLimpio, emailLimpio, claveLimpia);
-
-      setMensajeEstado({ 
-        tipo: 'exito', 
-        texto: `¡Banda registrada con éxito! Te enviamos tu palabra clave (${claveLimpia}) al correo guardado.` 
-      });
-      
       if (onSuccess) {
-        setTimeout(onSuccess, 3000);
+        setTimeout(onSuccess, 2500);
       }
 
     } catch (err: any) {
       console.error('Error durante el proceso de guardado:', err);
-      
-      if (archivosSubidosStorage.length > 0) {
-        await supabase.storage.from('Bandas').remove(archivosSubidosStorage);
-      }
-
-      if (bandaIdCreada) {
-        await supabase.from('bandas').delete().eq('id', bandaIdCreada);
-      }
-
       let textoError = err.message || 'Ocurrió un error inesperado. Por favor reintenta.';
 
       if (err.code === '23505' || err.message?.includes('bandas_nombre_unique_idx')) {
-        textoError = `La banda "${nombreLimpio}" ya se encuentra registrada en el Catálogo. Si eres integrante de esta banda, utiliza tu palabra clave para modificar sus datos.`;
+        textoError = `La banda "${nombreLimpio}" ya se encuentra registrada. Si eres integrante de esta banda, utiliza tu palabra clave para modificar sus datos.`;
         setPasoActual(1);
       }
 
@@ -467,51 +669,57 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
   };
 
   return (
-  <div className="max-w-5xl mx-auto bg-slate-900 text-slate-100 rounded-2xl shadow-2xl overflow-hidden border border-slate-800 my-8">
+    <div className="max-w-5xl mx-auto bg-slate-900 text-slate-100 rounded-2xl shadow-2xl overflow-hidden border border-slate-800 my-8">
 
-    {/* HEADER */}
-    <div 
-      className="relative p-8 transition-all duration-300 bg-cover bg-center"
-      style={{
-        backgroundColor: colorTema,
-        backgroundImage: portadaPreview 
-          ? `linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.95)), url(${portadaPreview})` 
-          : `linear-gradient(to bottom, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.95))`
-      }}
-    >
-      {/* Botón de navegación superior */}
-      {onVolver && (
-        <div className="mb-6 relative z-10 flex items-center">
-          <button
-            type="button"
-            onClick={onVolver}
-            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-colors bg-slate-900/60 border border-slate-700/80 px-4 py-2 rounded-xl backdrop-blur-md hover:border-indigo-500/50 cursor-pointer shadow-sm"
-          >
-            ← Volver al catálogo
-          </button>
+      {/* HEADER */}
+      <div 
+        className="relative p-8 transition-all duration-300 bg-cover bg-center"
+        style={{
+          backgroundColor: colorTema,
+          backgroundImage: portadaPreview 
+            ? `linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.95)), url(${portadaPreview})` 
+            : `linear-gradient(to bottom, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.95))`
+        }}
+      >
+        {onVolver && (
+          <div className="mb-6 relative z-10 flex items-center">
+            <button
+              type="button"
+              onClick={onVolver}
+              className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-colors bg-slate-900/60 border border-slate-700/80 px-4 py-2 rounded-xl backdrop-blur-md hover:border-indigo-500/50 cursor-pointer shadow-sm"
+            >
+              ← Volver al catálogo
+            </button>
+          </div>
+        )}
+
+        <div className="flex justify-between items-start relative z-10">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md text-white">
+                <Sparkles className="w-3.5 h-3.5" /> Ficha de Banda
+              </span>
+              {esModoEdicion && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/30 text-amber-200 border border-amber-500/40 backdrop-blur-md">
+                  Modo Edición
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
+              {nombre || 'Nombre de tu Banda'}
+            </h1>
+            <p className="text-slate-300 text-sm mt-1 max-w-xl">
+              {genero.length > 0 ? genero.join(' • ') : 'Selecciona hasta 3 géneros principales'}
+            </p>
+          </div>
         </div>
-      )}
 
-      <div className="flex justify-between items-start relative z-10">
-        <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md text-white mb-3">
-            <Sparkles className="w-3.5 h-3.5" /> Ficha de Banda
-          </span>
-          <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
-            {nombre || 'Nombre de tu Banda'}
-          </h1>
-          <p className="text-slate-300 text-sm mt-1 max-w-xl">
-            {genero.length > 0 ? genero.join(' • ') : 'Selecciona hasta 3 géneros principales'}
-          </p>
-        </div>
-      </div>
-
-      {/* NAVEGACIÓN PASOS */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8 relative z-10 w-full max-w-full">      
-                
+        {/* NAVEGACIÓN PASOS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8 relative z-10 w-full max-w-full">      
           {[
             { id: 1, label: 'Información Básica', icon: Users },
-            { id: 2, label: 'Integrantes', icon: Users },
+            { id: 2, label: `Integrantes (${integrantes.length})`, icon: Users },
             { id: 3, label: 'Música y Redes', icon: Music },
           ].map((paso) => {
             const Icon = paso.icon;
@@ -598,11 +806,21 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
                     type="text"
                     value={palabraClave}
                     onChange={(e) => setPalabraClave(e.target.value)}
-                    className="w-full bg-indigo-950/40 border border-indigo-500/40 rounded-lg pl-9 pr-20 py-2.5 text-indigo-200 font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full bg-indigo-950/40 border border-indigo-500/40 rounded-lg pl-9 pr-28 py-2.5 text-indigo-200 font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                     required
                   />
                   
                   <div className="absolute right-2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => cargarBandaPorClave(palabraClave)}
+                      disabled={cargandoDatos}
+                      title="Cargar datos de esta palabra clave"
+                      className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded transition flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {cargandoDatos ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                      <span>Cargar</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setPalabraClave(generarTokenAleatorio())}
@@ -622,7 +840,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
                   </div>
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  Copia o personaliza esta clave. Además, se enviará una copia al email registrado para que la conserves.
+                  Ingresa tu palabra clave y haz clic en <strong>"Cargar"</strong> para recuperar la información de tu banda.
                 </span>
               </div>
             </div>
@@ -758,7 +976,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
 
                     <label className="relative w-16 h-16 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden border border-slate-600 group-hover:border-indigo-500 transition">
                       {item.foto_preview ? (
-                        <img src={item.foto_preview} alt="Integrante" className="w-full h-full object-cover" />
+                        <img src={item.foto_preview} alt={item.nombre || 'Integrante'} className="w-full h-full object-cover" />
                       ) : (
                         <ImageIcon className="w-6 h-6 text-slate-400" />
                       )}
@@ -965,7 +1183,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess }) => 
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" /> Publicar Banda
+                    <Save className="w-4 h-4" /> {esModoEdicion ? 'Guardar Cambios' : 'Publicar Banda'}
                   </>
                 )}
               </button>

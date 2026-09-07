@@ -4,8 +4,7 @@ import { supabase } from './lib/supabaseClient';
 import Header from './components/Header';
 import ListaBandas from './components/ListaBandas';
 import LandingBanda from './components/LandingBanda'; 
-import { FormBanda } from "./components/FormularioBanda"; 
-import EditarBanda from './components/EditarBanda';
+import { FormBanda } from "./components/FormularioBanda";
 import AdminPanel from './components/PanelAdmin'; 
 import Footer from './components/Footer';
 
@@ -124,11 +123,7 @@ export default function App() {
             onSuccess={() => handleNavegar('catalogo')}
             onVolver={() => handleNavegar('catalogo')}
           />
-        )}
-
-        {vista === 'editar' && (
-          <EditarBanda onVolver={() => handleNavegar('catalogo')} />
-        )}
+        )}        
 
         {vista === 'admin' && (
           <AdminPanel />

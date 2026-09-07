@@ -13,6 +13,33 @@ const TEMAS_MAPA: Record<string, string> = {
   lime: '#84cc16',
 };
 
+function asegurarContrasteOscuro(hexColor?: string | null, defaultColor = '#6366f1'): string {
+  if (!hexColor) return defaultColor;
+  let hex = hexColor.trim();
+  if (!hex.startsWith('#')) return hexColor;
+  
+  if (hex.length === 4) {
+    hex = '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+  }
+  if (hex.length !== 7) return defaultColor;
+
+  const r = parseInt(hex.substring(1, 3), 16) || 0;
+  const g = parseInt(hex.substring(3, 5), 16) || 0;
+  const b = parseInt(hex.substring(5, 7), 16) || 0;
+
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+
+  if (yiq < 130) {
+    const aclarar = (v: number) => Math.min(255, Math.round(v + (255 - v) * 0.65));
+    const newR = aclarar(r).toString(16).padStart(2, '0');
+    const newG = aclarar(g).toString(16).padStart(2, '0');
+    const newB = aclarar(b).toString(16).padStart(2, '0');
+    return `#${newR}${newG}${newB}`;
+  }
+
+  return hex;
+}
+
 export interface BandaResumen {
   id: string;
   nombre: string;
@@ -58,7 +85,6 @@ export default function CatalogoBandas({
     cargarBandas();
   }, []);
 
-  // Extrae y desduplica géneros individuales
   const generosDisponibles = useMemo(() => {
     const generosSet = new Set<string>();
 
@@ -76,7 +102,6 @@ export default function CatalogoBandas({
     return ['todos', ...Array.from(generosSet)];
   }, [bandas]);
 
-  // Filtra por búsqueda o término exacto de género
   const bandasFiltradas = useMemo(() => {
     return bandas.filter((banda) => {
       const coincideBusqueda =
@@ -98,8 +123,6 @@ export default function CatalogoBandas({
 
   return (
     <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
-      
-      {/* Header Fijo Estilo Gmail */}
       <header className="shrink-0 border-b border-border/60 bg-card/20 px-6 py-4 flex items-center justify-between z-10">
         <div>
           <h1 className="sr-only text-2xl font-black uppercase tracking-tight text-white">
@@ -119,10 +142,7 @@ export default function CatalogoBandas({
         )}
       </header>
 
-      {/* Estructura Central (Sidebar + Main) */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        
-        {/* Sidebar Fijo */}
         <BuscadorSidebar
           busqueda={busqueda}
           onBusquedaChange={setBusqueda}
@@ -131,7 +151,6 @@ export default function CatalogoBandas({
           onGeneroChange={setGeneroFiltro}
         />
 
-        {/* Sección de Cards con Scroll */}
         <main className="flex-1 overflow-y-auto p-6 md:p-8">
           {cargando ? (
             <div className="min-h-[300px] flex flex-col items-center justify-center space-y-3">
@@ -144,17 +163,19 @@ export default function CatalogoBandas({
             <div className="text-center py-16 bg-card/20 border border-border/60 rounded-2xl space-y-2">
               <p className="text-white font-medium">No se encontraron bandas.</p>
               <p className="text-xs text-muted-foreground">
-                Intenta cambiar el término de búsqueda o aprueba las bandas desde el panel de administración.
+                Intenta cambiar el término de búsqueda.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 max-w-4xl mx-auto">
               {bandasFiltradas.map((banda) => {
-                const colorHex =
-                  banda.color_tema ||
-                  TEMAS_MAPA[banda.color_tema?.toLowerCase() || 'indigo'] ||
-                  '#6366f1';
-
+                const rawColor = banda.color_tema || '#6366f1';
+                const baseColor = rawColor.startsWith('#')
+                  ? rawColor
+                  : TEMAS_MAPA[rawColor.toLowerCase()] || '#6366f1';
+                
+                // Color procesado para alto contraste
+                const colorHex = asegurarContrasteOscuro(baseColor);
                 const textoTarjeta = banda.bio || banda.historia;
 
                 return (
@@ -163,7 +184,6 @@ export default function CatalogoBandas({
                     onClick={() => onSeleccionarBanda(banda.id)}
                     className="group bg-card/40 border border-border/80 rounded-2xl overflow-hidden backdrop-blur-sm hover:border-primary/60 transition-all duration-300 flex flex-col sm:flex-row items-center cursor-pointer shadow-md hover:shadow-xl hover:-translate-y-0.5"
                   >
-                    {/* Portada compacta */}
                     <div className="relative w-full sm:w-40 h-36 sm:h-36 bg-slate-950 overflow-hidden shrink-0">
                       {banda.url_portada ? (
                         <img
@@ -178,12 +198,11 @@ export default function CatalogoBandas({
                       )}
                     </div>
 
-                    {/* Contenido principal de la tarjeta */}
                     <div className="p-5 space-y-2 flex-1 w-full">
                       {banda.genero && (
                         <span
                           className="inline-block text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border bg-card/80"
-                          style={{ color: colorHex, borderColor: `${colorHex}50` }}
+                          style={{ color: colorHex, borderColor: `${colorHex}60` }}
                         >
                           {banda.genero}
                         </span>

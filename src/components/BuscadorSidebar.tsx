@@ -44,71 +44,12 @@ export function BuscadorSidebar({
   onGeneroChange,
 }: BuscadorSidebarProps) {
   const [desplegarRadiosMobile, setDesplegarRadiosMobile] = useState(false);
-  
-  // Estado que controla si se expande la sección de búsqueda y géneros en móvil
   const [mostrarBuscadorMovil, setMostrarBuscadorMovil] = useState(false);
 
   return (
     <aside className="w-full md:w-80 bg-card/40 border-b md:border-b-0 md:border-r border-border/60 p-4 md:p-6 flex flex-col gap-4 md:gap-6 shrink-0 md:h-full overflow-x-hidden md:overflow-y-auto">
       
-      {/* 1. SECCIÓN DE BÚSQUEDA Y FILTROS */}
-      <div className="relative flex flex-col gap-3">
-        {/* Título en Desktop */}
-        <h2 className="hidden md:flex text-xs font-extrabold uppercase tracking-wider text-muted-foreground mb-1 items-center gap-1.5">
-          <Search className="w-3.5 h-3.5 text-primary" />
-          <span>Explorar</span>
-        </h2>
-
-        {/* Botón Minimizado para Móvil (Muestra Lupa + Estado de Filtro Actual) */}
-        {!mostrarBuscadorMovil && (
-          <button
-            type="button"
-            onClick={() => setMostrarBuscadorMovil(true)}
-            className="md:hidden flex items-center justify-between w-full bg-card/80 border border-border/80 rounded-xl px-3.5 py-2.5 text-sm text-muted-foreground hover:text-white hover:border-primary/50 transition-all shadow-inner cursor-pointer group"
-            aria-label="Abrir búsqueda y filtros"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <Search className="w-4 h-4 text-primary shrink-0" />
-              <span className="text-xs font-medium text-muted-foreground group-hover:text-white truncate">
-                {busqueda ? `"${busqueda}"` : 'Buscar o filtrar por género...'}
-              </span>
-            </div>
-
-            {/* Badge de género seleccionado al estar minimizado */}
-            {generoFiltro && (
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-md shrink-0 ml-2">
-                {generoFiltro}
-              </span>
-            )}
-          </button>
-        )}
-
-        {/* Input de Búsqueda (Se despliega en móvil / Siempre visible en Desktop) */}
-        <div className={`${mostrarBuscadorMovil ? 'block' : 'hidden'} md:block relative w-full animate-in fade-in slide-in-from-top-1 duration-200`}>
-          <input
-            type="text"
-            placeholder="Buscar banda o género..."
-            value={busqueda}
-            onChange={(e) => onBusquedaChange(e.target.value)}
-            className="w-full bg-card/80 border border-border/80 rounded-xl pl-3.5 pr-10 py-2.5 text-sm text-white placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-inner"
-            autoFocus={mostrarBuscadorMovil}
-          />
-          
-          {/* Botón para cerrar la búsqueda y filtros en móvil */}
-          {mostrarBuscadorMovil && (
-            <button
-              type="button"
-              onClick={() => setMostrarBuscadorMovil(false)}
-              className="md:hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white p-1 rounded-md hover:bg-card/80 transition-colors"
-              aria-label="Cerrar búsqueda y filtros"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 2. PUBLICIDAD DE RADIOS */}
+      {/* 1. PUBLICIDAD DE RADIOS (AHORA PRIMERO) */}
 
       {/* A) VERSIÓN MÓVIL (COMPACTA) */}
       <div className="block md:hidden bg-amber-500/5 border border-amber-500/20 rounded-xl p-2.5 transition-all">
@@ -212,7 +153,64 @@ export function BuscadorSidebar({
         </div>
       </div>
 
-      {/* 3. LISTA DE GÉNEROS (Oculta en móvil cuando está minimizado, visible al expandir o en desktop) */}
+      {/* 2. SECCIÓN DE BÚSQUEDA Y FILTROS */}
+      <div className="relative flex flex-col gap-3">
+        {/* Título en Desktop */}
+        <h2 className="hidden md:flex text-xs font-extrabold uppercase tracking-wider text-muted-foreground mb-1 items-center gap-1.5">
+          <Search className="w-3.5 h-3.5 text-primary" />
+          <span>Explorar</span>
+        </h2>
+
+        {/* Botón Minimizado para Móvil */}
+        {!mostrarBuscadorMovil && (
+          <button
+            type="button"
+            onClick={() => setMostrarBuscadorMovil(true)}
+            className="md:hidden flex items-center justify-between w-full bg-card/80 border border-border/80 rounded-xl px-3.5 py-2.5 text-sm text-muted-foreground hover:text-white hover:border-primary/50 transition-all shadow-inner cursor-pointer group"
+            aria-label="Abrir búsqueda y filtros"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Search className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-xs font-medium text-muted-foreground group-hover:text-white truncate">
+                {busqueda ? `"${busqueda}"` : 'Buscar o filtrar por género...'}
+              </span>
+            </div>
+
+            {/* Badge de género seleccionado al estar minimizado */}
+            {generoFiltro && (
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-md shrink-0 ml-2">
+                {generoFiltro}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Input de Búsqueda */}
+        <div className={`${mostrarBuscadorMovil ? 'block' : 'hidden'} md:block relative w-full animate-in fade-in slide-in-from-top-1 duration-200`}>
+          <input
+            type="text"
+            placeholder="Buscar banda o género..."
+            value={busqueda}
+            onChange={(e) => onBusquedaChange(e.target.value)}
+            className="w-full bg-card/80 border border-border/80 rounded-xl pl-3.5 pr-10 py-2.5 text-sm text-white placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-inner"
+            autoFocus={mostrarBuscadorMovil}
+          />
+          
+          {/* Botón para cerrar la búsqueda y filtros en móvil */}
+          {mostrarBuscadorMovil && (
+            <button
+              type="button"
+              onClick={() => setMostrarBuscadorMovil(false)}
+              className="md:hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white p-1 rounded-md hover:bg-card/80 transition-colors"
+              aria-label="Cerrar búsqueda y filtros"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 3. LISTA DE GÉNEROS */}
       {generosDisponibles.length > 1 && (
         <div className={`${mostrarBuscadorMovil ? 'flex' : 'hidden md:flex'} flex-col gap-2 md:gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200`}>
           <h2 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground px-1">

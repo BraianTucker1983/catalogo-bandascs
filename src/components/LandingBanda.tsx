@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-// Mapa de colores
 const TEMAS_MAPA: Record<string, { primary: string; bgGlow: string }> = {
   purple: { primary: '#a855f7', bgGlow: 'rgba(168, 85, 247, 0.25)' },
   emerald: { primary: '#10b981', bgGlow: 'rgba(16, 185, 129, 0.25)' },
@@ -13,19 +12,49 @@ const TEMAS_MAPA: Record<string, { primary: string; bgGlow: string }> = {
   lime: { primary: '#84cc16', bgGlow: 'rgba(132, 204, 22, 0.25)' },
 };
 
+// Asistente para asegurar legibilidad sobre fondos oscuros
+function asegurarContrasteOscuro(hexColor?: string | null, defaultColor = '#6366f1'): string {
+  if (!hexColor) return defaultColor;
+  let hex = hexColor.trim();
+  if (!hex.startsWith('#')) return hexColor;
+  
+  if (hex.length === 4) {
+    hex = '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+  }
+  if (hex.length !== 7) return defaultColor;
+
+  const r = parseInt(hex.substring(1, 3), 16) || 0;
+  const g = parseInt(hex.substring(3, 5), 16) || 0;
+  const b = parseInt(hex.substring(5, 7), 16) || 0;
+
+  // Cálculo de luminancia percibida YIQ
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+
+  // Si el color es muy oscuro (YIQ < 130), se aclara mezclándolo con blanco
+  if (yiq < 130) {
+    const aclarar = (v: number) => Math.min(255, Math.round(v + (255 - v) * 0.65));
+    const newR = aclarar(r).toString(16).padStart(2, '0');
+    const newG = aclarar(g).toString(16).padStart(2, '0');
+    const newB = aclarar(b).toString(16).padStart(2, '0');
+    return `#${newR}${newG}${newB}`;
+  }
+
+  return hex;
+}
+
 interface Integrante {
   id: string | number;
   nombre: string;
-  rol?: string | null;       // CORREGIDO (coincide con 'rol' del formulario)
-  foto_url?: string | null;  // CORREGIDO (coincide con 'foto_url' del formulario)
+  rol?: string | null;
+  foto_url?: string | null;
   instagram?: string | null;
 }
 
 interface Cancion {
   id: string | number;
   titulo: string;
-  url_audio?: string | null; // CORREGIDO
-  spotify_id?: string | null; // CORREGIDO
+  url_audio?: string | null;
+  spotify_id?: string | null;
 }
 
 interface BandaDetalle {
@@ -34,11 +63,11 @@ interface BandaDetalle {
   genero?: string | null;
   bio?: string | null;
   historia?: string | null;
-  url_portada?: string | null; // CORREGIDO (coincide con 'url_portada' del formulario)
+  url_portada?: string | null;
   instagram_url?: string | null;
-  spotify_url?: string | null; // CORREGIDO
-  youtube_url?: string | null;  // CORREGIDO
-  color_tema?: string | null;   // CORREGIDO (coincide con 'color_tema' del formulario)
+  spotify_url?: string | null;
+  youtube_url?: string | null;
+  color_tema?: string | null;
   integrantes?: Integrante[];
   canciones?: Cancion[];
 }
@@ -48,22 +77,10 @@ interface LandingBandaProps {
   onVolver: () => void;
 }
 
-function parseYoutubeEmbed(url?: string | null): string | null {
-  if (!url || typeof url !== 'string') return null;
-  const urlLimpia = url.trim();
-  if (urlLimpia.includes('/embed/')) return urlLimpia;
-
-  const match = urlLimpia.match(
-    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([\w-]{11})/
-  );
-  return match ? `https://www.youtube.com/embed/${match[1]}` : null;
-}
-
 function parseSpotifyEmbed(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
   const urlLimpia = url.trim();
   if (urlLimpia.includes('open.spotify.com/embed/')) return urlLimpia;
-
   if (urlLimpia.includes('open.spotify.com/')) {
     return urlLimpia.replace('open.spotify.com/', 'open.spotify.com/embed/');
   }
@@ -97,23 +114,9 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
         }
 
         const [integrantesRes, cancionesRes] = await Promise.all([
-          supabase
-            .from('integrantes')
-            .select('*')
-            .eq('banda_id', bandaId),
-          supabase
-            .from('canciones')
-            .select('*')
-            .eq('banda_id', bandaId),
+          supabase.from('integrantes').select('*').eq('banda_id', bandaId),
+          supabase.from('canciones').select('*').eq('banda_id', bandaId),
         ]);
-
-        if (integrantesRes.error) {
-          console.warn('Error al cargar integrantes:', integrantesRes.error.message);
-        }
-
-        if (cancionesRes.error) {
-          console.warn('Error al cargar canciones:', cancionesRes.error.message);
-        }
 
         if (!cancelado) {
           setBanda({
@@ -124,34 +127,31 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
         }
       } catch (err: unknown) {
         if (!cancelado) {
-          const mensaje =
-            err instanceof Error ? err.message : 'Error desconocido al cargar la banda.';
-          console.error('Error al cargar la landing de la banda:', mensaje);
+          const mensaje = err instanceof Error ? err.message : 'Error al cargar la banda.';
           setErrorCarga(mensaje);
         }
       } finally {
-        if (!cancelado) {
-          setCargando(false);
-        }
+        if (!cancelado) setCargando(false);
       }
     }
 
-    if (bandaId) {
-      cargarDetalleBanda();
-    }
-
-    return () => {
-      cancelado = true;
-    };
+    if (bandaId) cargarDetalleBanda();
+    return () => { cancelado = true; };
   }, [bandaId]);
 
+  // Cálculo del tema garantizando luminancia
   const temaActivo = useMemo(() => {
     const rawColor = banda?.color_tema || '#6366f1';
+    let primaryColor = '#6366f1';
+
     if (rawColor.startsWith('#')) {
-      return { primary: rawColor, bgGlow: `${rawColor}40` };
+      primaryColor = asegurarContrasteOscuro(rawColor);
+    } else {
+      const claveTema = rawColor.toLowerCase();
+      primaryColor = TEMAS_MAPA[claveTema]?.primary || TEMAS_MAPA.indigo.primary;
     }
-    const claveTema = rawColor.toLowerCase();
-    return TEMAS_MAPA[claveTema] || TEMAS_MAPA.indigo;
+
+    return { primary: primaryColor, bgGlow: `${primaryColor}40` };
   }, [banda?.color_tema]);
 
   if (cargando) {
@@ -170,9 +170,7 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
       <div className="max-w-2xl mx-auto px-4 py-20 text-center space-y-6">
         <div className="p-8 rounded-2xl border border-destructive/30 bg-destructive/10">
           <p className="text-destructive font-medium text-sm">
-            {errorCarga
-              ? 'No se pudo cargar la información de la banda.'
-              : 'No se encontró la banda seleccionada.'}
+            {errorCarga ? 'No se pudo cargar la información.' : 'No se encontró la banda.'}
           </p>
         </div>
         <button
@@ -188,14 +186,12 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden pb-24">
-      {/* Resplandor temático dinámico de fondo */}
       <div
         className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] blur-[140px] pointer-events-none opacity-30 transition-all duration-700 z-0"
         style={{ backgroundColor: temaActivo.bgGlow }}
       />
 
       <div className="max-w-4xl mx-auto px-4 pt-8 relative z-10 space-y-10">
-        {/* Botón Volver */}
         <div>
           <button
             type="button"
@@ -206,14 +202,12 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           </button>
         </div>
 
-        {/* Encabezado Principal / Hero */}
         <header className="text-center space-y-6 pt-2">
           {banda.url_portada && (
             <div className="w-full rounded-2xl overflow-hidden border border-border/60 shadow-2xl relative bg-slate-950/80 p-3 md:p-6 flex items-center justify-center">
               <img
                 src={banda.url_portada}
                 alt=""
-                aria-hidden="true"
                 className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none scale-125"
               />
               <img
@@ -228,8 +222,8 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
             {banda.genero && (
               <div>
                 <span
-                  className="inline-block text-[11px] font-black uppercase tracking-widest px-3.5 py-1 rounded-full border border-border bg-card/80 backdrop-blur-md shadow-sm"
-                  style={{ color: temaActivo.primary, borderColor: `${temaActivo.primary}40` }}
+                  className="inline-block text-[11px] font-black uppercase tracking-widest px-3.5 py-1 rounded-full border bg-card/80 backdrop-blur-md shadow-sm"
+                  style={{ color: temaActivo.primary, borderColor: `${temaActivo.primary}50` }}
                 >
                   {banda.genero}
                 </span>
@@ -282,7 +276,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           )}
         </header>
 
-        {/* Biografía / Historia */}
         {(banda.historia || banda.bio) && (
           <section className="bg-card/40 border border-border/80 p-6 md:p-8 rounded-2xl backdrop-blur-md shadow-lg space-y-3">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -294,7 +287,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           </section>
         )}
 
-        {/* Formación / Integrantes */}
         {banda.integrantes && banda.integrantes.length > 0 && (
           <section className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1 flex items-center gap-2">
@@ -350,7 +342,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           </section>
         )}
 
-        {/* Canciones / Singles */}
         {banda.canciones && banda.canciones.length > 0 && (
           <section className="space-y-6">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground pl-1 flex items-center gap-2">
