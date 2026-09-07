@@ -48,6 +48,7 @@ export interface BandaResumen {
   historia?: string | null;
   url_portada?: string | null;
   color_tema?: string | null;
+  aprobado?: boolean | null;
 }
 
 interface CatalogoBandasProps {
@@ -61,28 +62,48 @@ export default function CatalogoBandas({
 }: CatalogoBandasProps) {
   const [bandas, setBandas] = useState<BandaResumen[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [errorQuery, setErrorQuery] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [generoFiltro, setGeneroFiltro] = useState<string>('todos');
 
   useEffect(() => {
+    let cancelado = false;
+
     async function cargarBandas() {
       try {
         setCargando(true);
+        setErrorQuery(null);
+
+        // Trae únicamente las bandas aprobadas por el administrador
         const { data, error } = await supabase
           .from('bandas')
-          .select('id, nombre, genero, bio, historia, url_portada, color_tema')
+          .select('id, nombre, genero, bio, historia, url_portada, color_tema, aprobado')
           .eq('aprobado', true)
           .order('nombre', { ascending: true });
 
         if (error) throw error;
-        setBandas(data || []);
+
+        if (!cancelado) {
+          setBandas(data || []);
+        }
       } catch (err) {
-        console.error('Error al cargar catálogo de bandas:', err);
+        if (!cancelado) {
+          const msg = err instanceof Error ? err.message : 'Error al cargar catálogo.';
+          console.error('Error:', msg);
+          setErrorQuery(msg);
+        }
       } finally {
-        setCargando(false);
+        if (!cancelado) {
+          setCargando(false);
+        }
       }
     }
+
     cargarBandas();
+
+    return () => {
+      cancelado = true;
+    };
   }, []);
 
   const generosDisponibles = useMemo(() => {
@@ -122,10 +143,10 @@ export default function CatalogoBandas({
   }, [bandas, busqueda, generoFiltro]);
 
   return (
-    <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
+    <div className="w-full flex flex-col bg-background text-foreground rounded-2xl border border-border/40 overflow-hidden shadow-xl">
       <header className="shrink-0 border-b border-border/60 bg-card/20 px-6 py-4 flex items-center justify-between z-10">
         <div>
-          <h1 className="sr-only text-2xl font-black uppercase tracking-tight text-white">
+          <h1 className="text-xl font-black uppercase tracking-tight text-white">
             Catálogo de Bandas
           </h1>
           <p className="text-muted-foreground text-xs mt-0.5">
@@ -135,14 +156,14 @@ export default function CatalogoBandas({
         {onNuevaBanda && (
           <button
             onClick={onNuevaBanda}
-            className="px-4 py-2 bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider rounded-xl hover:opacity-90 transition-opacity"
+            className="px-4 py-2 bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
           >
             + Nueva Banda
           </button>
         )}
       </header>
 
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <div className="flex flex-col md:flex-row min-h-[500px]">
         <BuscadorSidebar
           busqueda={busqueda}
           onBusquedaChange={setBusqueda}
@@ -151,7 +172,7 @@ export default function CatalogoBandas({
           onGeneroChange={setGeneroFiltro}
         />
 
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto">
           {cargando ? (
             <div className="min-h-[300px] flex flex-col items-center justify-center space-y-3">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -159,11 +180,18 @@ export default function CatalogoBandas({
                 Cargando catálogo...
               </p>
             </div>
+          ) : errorQuery ? (
+            <div className="text-center py-12 px-4 bg-destructive/10 border border-destructive/30 rounded-2xl space-y-3 max-w-md mx-auto">
+              <p className="text-destructive font-bold text-sm">Error al consultar Supabase</p>
+              <p className="text-xs text-muted-foreground font-mono bg-black/40 p-3 rounded-lg text-left break-words">
+                {errorQuery}
+              </p>
+            </div>
           ) : bandasFiltradas.length === 0 ? (
             <div className="text-center py-16 bg-card/20 border border-border/60 rounded-2xl space-y-2">
-              <p className="text-white font-medium">No se encontraron bandas.</p>
+              <p className="text-white font-medium">No se encontraron bandas aprobadas.</p>
               <p className="text-xs text-muted-foreground">
-                Intenta cambiar el término de búsqueda.
+                Si acabas de registrar una banda, requiere la aprobación de un administrador para figurar en la lista.
               </p>
             </div>
           ) : (
@@ -174,7 +202,6 @@ export default function CatalogoBandas({
                   ? rawColor
                   : TEMAS_MAPA[rawColor.toLowerCase()] || '#6366f1';
                 
-                // Color procesado para alto contraste
                 const colorHex = asegurarContrasteOscuro(baseColor);
                 const textoTarjeta = banda.bio || banda.historia;
 

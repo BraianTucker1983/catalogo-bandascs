@@ -42,7 +42,7 @@ export default function Header({ onNavegar, vistaActual }: HeaderProps) {
           >
             <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
               <span className="animate-bounce">🎸</span>
-              <span>Inscribir / Mi Banda</span>
+              <span>Inscribir mi Banda o modificar datos</span>
             </div>
           </button>
         </nav>
@@ -81,7 +81,7 @@ export default function Header({ onNavegar, vistaActual }: HeaderProps) {
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-emerald-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg cursor-pointer"
           >
             <span>🎸</span>
-            <span>Inscribir / Mi Banda</span>
+            <span>Inscribir mi Banda o modificar datos</span>
           </button>
         </div>
       )}

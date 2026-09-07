@@ -12,7 +12,6 @@ const TEMAS_MAPA: Record<string, { primary: string; bgGlow: string }> = {
   lime: { primary: '#84cc16', bgGlow: 'rgba(132, 204, 22, 0.25)' },
 };
 
-// Asistente para asegurar legibilidad sobre fondos oscuros
 function asegurarContrasteOscuro(hexColor?: string | null, defaultColor = '#6366f1'): string {
   if (!hexColor) return defaultColor;
   let hex = hexColor.trim();
@@ -27,10 +26,8 @@ function asegurarContrasteOscuro(hexColor?: string | null, defaultColor = '#6366
   const g = parseInt(hex.substring(3, 5), 16) || 0;
   const b = parseInt(hex.substring(5, 7), 16) || 0;
 
-  // Cálculo de luminancia percibida YIQ
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
 
-  // Si el color es muy oscuro (YIQ < 130), se aclara mezclándolo con blanco
   if (yiq < 130) {
     const aclarar = (v: number) => Math.min(255, Math.round(v + (255 - v) * 0.65));
     const newR = aclarar(r).toString(16).padStart(2, '0');
@@ -139,7 +136,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
     return () => { cancelado = true; };
   }, [bandaId]);
 
-  // Cálculo del tema garantizando luminancia
   const temaActivo = useMemo(() => {
     const rawColor = banda?.color_tema || '#6366f1';
     let primaryColor = '#6366f1';
@@ -307,13 +303,20 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                     className="bg-card/40 border border-border/80 rounded-2xl overflow-hidden backdrop-blur-sm p-4 space-y-3 hover:border-border/100 transition-colors shadow-md flex flex-col justify-between"
                   >
                     <div className="space-y-3">
-                      <div className="w-full h-48 sm:h-52 rounded-xl overflow-hidden bg-slate-900 border border-border/40">
+                      {/* Contenedor adaptativo con fondo difuminado sin recorte de imagen */}
+                      <div className="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-slate-950 border border-border/40 flex items-center justify-center">
+                        <img
+                          src={fotoSrc}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover opacity-30 blur-md pointer-events-none scale-110"
+                        />
                         <img
                           src={fotoSrc}
                           alt={miembro.nombre}
-                          className="w-full h-full object-cover"
+                          className="relative z-10 w-full h-full object-contain p-1"
                         />
                       </div>
+
                       <div>
                         <p className="font-bold text-white text-base md:text-lg">{miembro.nombre}</p>
                         {miembro.rol && (

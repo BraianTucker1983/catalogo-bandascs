@@ -96,10 +96,10 @@ export default function Footer({
               >
                 <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
                   <span className="animate-bounce">🎸</span>
-                  <span>Inscribir Banda</span>
+                  <span>Inscribir mi Banda o modificar datos</span>
                 </div>
               </button>
-              <p className="text-xs leading-relaxed text-muted-foreground">
+              {/* <p className="text-xs leading-relaxed text-muted-foreground">
               Actualizá los datos de tu banda.
             </p>
               <button
@@ -111,7 +111,7 @@ export default function Footer({
                   <Edit3 className="w-3.5 h-3.5 text-primary" />
                   <span>Modificar Datos</span>
                 </div>
-              </button>
+              </button> */}
             </div>
           </div>
 
