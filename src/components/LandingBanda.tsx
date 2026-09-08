@@ -76,11 +76,15 @@ interface LandingBandaProps {
 
 function parseSpotifyEmbed(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
-  const urlLimpia = url.trim();
-  if (urlLimpia.includes('open.spotify.com/embed/')) return urlLimpia;
-  if (urlLimpia.includes('open.spotify.com/')) {
-    return urlLimpia.replace('open.spotify.com/', 'open.spotify.com/embed/');
+  
+  // Extrae únicamente el tipo (artist, track, album, playlist) y el ID
+  const match = url.trim().match(/(track|album|artist|playlist)\/([a-zA-Z0-9]+)/);
+  
+  if (match) {
+    const [, tipo, id] = match;
+    return `https://open.spotify.com/embed/${tipo}/${id}`;
   }
+
   return null;
 }
 
