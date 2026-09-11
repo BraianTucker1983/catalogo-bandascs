@@ -77,7 +77,6 @@ interface LandingBandaProps {
 function parseSpotifyEmbed(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
   
-  // Extrae únicamente el tipo (artist, track, album, playlist) y el ID
   const match = url.trim().match(/(track|album|artist|playlist)\/([a-zA-Z0-9]+)/);
   
   if (match) {
@@ -218,6 +217,20 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
             </div>
           )}
 
+          {/* LINK A INSTAGRAM DIRECTO ABAJO DE LA PORTADA */}
+          {banda.instagram_url && (
+            <div className="flex justify-center pt-1">
+              <a
+                href={banda.instagram_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-xs md:text-sm font-bold uppercase tracking-wider px-5 py-2.5 bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white rounded-xl shadow-lg hover:opacity-90 hover:scale-105 transition-all"
+              >
+                <span>Instagram Oficial de {banda.nombre}</span> ↗
+              </a>
+            </div>
+          )}
+
           <div className="space-y-3">
             {banda.genero && (
               <div>
@@ -307,7 +320,6 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                     className="bg-card/40 border border-border/80 rounded-2xl overflow-hidden backdrop-blur-sm p-4 space-y-3 hover:border-border/100 transition-colors shadow-md flex flex-col justify-between"
                   >
                     <div className="space-y-3">
-                      {/* Contenedor adaptativo con fondo difuminado sin recorte de imagen */}
                       <div className="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-slate-950 border border-border/40 flex items-center justify-center">
                         <img
                           src={fotoSrc}

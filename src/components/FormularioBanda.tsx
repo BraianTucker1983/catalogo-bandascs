@@ -15,7 +15,6 @@ import {
   Loader2, 
   Sparkles,   
   Disc,
-  X,
   Mail,
   Key,
   RefreshCw,
@@ -24,10 +23,27 @@ import {
   Search
 } from 'lucide-react';
 
+// SVG Nativo de Instagram para evitar errores con versiones viejas de lucide-react
+const InstagramIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg 
+    className={className} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+  </svg>
+);
+
 interface FormBandaProps {
   onVolver?: () => void;
   onSuccess?: () => void;
-  palabraClaveEdicion?: string; // Permite pasar una clave inicial si se ingresa desde otra pantalla
+  palabraClaveEdicion?: string;
 }
 
 interface Integrante {
@@ -58,12 +74,10 @@ const generarTokenAleatorio = () => {
 };
 
 export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palabraClaveEdicion }) => {
-  // --- ESTADO DE EDICIÓN ---
   const [esModoEdicion, setEsModoEdicion] = useState(false);
   const [bandaId, setBandaId] = useState<string | null>(null);
   const [cargandoDatos, setCargandoDatos] = useState(false);
 
-  // --- ESTADOS BÁSICOS & AUTENTICACIÓN ---
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [palabraClave, setPalabraClave] = useState(generarTokenAleatorio());
@@ -73,25 +87,21 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
   const [historia, setHistoria] = useState('');
   const [colorTema, setColorTema] = useState('#6366f1');
 
-  // --- REDES SOCIALES ---
+  // REDES SOCIALES DE LA BANDA
   const [spotifyUrl, setSpotifyUrl] = useState('');
   const [instagramUrl, setInstagramUrl] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
 
-  // --- IMÁGENES / ARCHIVOS ---
   const [portadaFile, setPortadaFile] = useState<File | null>(null);
   const [portadaPreview, setPortadaPreview] = useState<string | null>(null);
 
-  // --- INTEGRANTES Y CANCIONES ---
   const [integrantes, setIntegrantes] = useState<Integrante[]>([]);
   const [canciones, setCanciones] = useState<Cancion[]>([]);
 
-  // --- UI & FEEDBACK ---
   const [loading, setLoading] = useState(false);
   const [mensajeEstado, setMensajeEstado] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3>(1);
 
-  // --- GESTIÓN DE MEMORIA ---
   const activeObjectUrls = useRef<Set<string>>(new Set());
 
   const crearObjectUrl = (file: File): string => {
@@ -114,7 +124,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     };
   }, []);
 
-  // --- FUNCIÓN DE CARGA DE BANDA POR PALABRA CLAVE ---
   const cargarBandaPorClave = async (claveABuscar: string) => {
     if (!claveABuscar.trim()) {
       setMensajeEstado({ tipo: 'error', texto: 'Ingresa una palabra clave válida.' });
@@ -141,7 +150,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         return;
       }
 
-      // 1. Cargar datos base de la banda
       setBandaId(data.id);
       setEsModoEdicion(true);
       setNombre(data.nombre || '');
@@ -155,21 +163,19 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
       setYoutubeUrl(data.youtube_url || '');
       setPortadaPreview(data.url_portada || null);
 
-      // 2. Formatear géneros ("Rock, Pop" -> ['Rock', 'Pop'])
       if (data.genero) {
         setGenero(data.genero.split(', ').map((g: string) => g.trim()).filter(Boolean));
       } else {
         setGenero([]);
       }
 
-      // 3. Formatear integrantes (mapeando foto_url a foto_preview)
       if (data.integrantes && Array.isArray(data.integrantes)) {
         const ints: Integrante[] = data.integrantes.map((i: any) => ({
           id: i.id || crypto.randomUUID(),
           nombre: i.nombre || '',
           rol: i.rol || '',
           foto_file: null,
-          foto_preview: i.foto_url || null, // Mapeo clave para visualizar foto existente
+          foto_preview: i.foto_url || null,
           instagram: i.instagram || '',
           facebook: i.facebook || '',
         }));
@@ -178,7 +184,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         setIntegrantes([]);
       }
 
-      // 4. Formatear canciones
       if (data.canciones && Array.isArray(data.canciones)) {
         const canc: Cancion[] = data.canciones.map((c: any) => ({
           id: c.id || crypto.randomUUID(),
@@ -406,7 +411,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     const archivosSubidosStorage: string[] = [];
 
     try {
-      // 1. Manejo de la Portada (Mantiene la previa si no se subió un nuevo archivo)
       let urlPortadaFinal: string | null = portadaPreview; 
 
       if (portadaFile) {
@@ -429,7 +433,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
       }
 
       if (esModoEdicion && bandaId) {
-        // --- PROCESO DE ACTUALIZACIÓN (MODO EDICIÓN) ---
         const { error: updateErr } = await supabase
           .from('bandas')
           .update({
@@ -449,7 +452,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
 
         if (updateErr) throw updateErr;
 
-        // Actualizar integrantes: Eliminar previos y reinsertar actualizados
         const { error: deleteIntErr } = await supabase
           .from('integrantes')
           .delete()
@@ -503,7 +505,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           }
         }
 
-        // Actualizar canciones: Eliminar previas y reinsertar actualizadas
         const { error: deleteCancErr } = await supabase
           .from('canciones')
           .delete()
@@ -534,7 +535,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         });
 
       } else {
-        // --- PROCESO DE REGISTRO NUEVO (MODO CREACIÓN) ---
         const { data: existeBanda } = await supabase
           .from('bandas')
           .select('id')
@@ -764,18 +764,38 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         {/* PASO 1 */}
         {pasoActual === 1 && (
           <div className="space-y-6 animate-fade-in">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Nombre de la Banda <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej: Los Pericos, Soda Stereo..."
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                required
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Nombre de la Banda <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  placeholder="Ej: Los Pericos, Soda Stereo..."
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Instagram Oficial de la Banda
+                </label>
+                <div className="relative flex items-center">
+                  <div className="absolute left-3 text-pink-400">
+                    <InstagramIcon className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="url"
+                    value={instagramUrl}
+                    onChange={(e) => setInstagramUrl(e.target.value)}
+                    placeholder="https://instagram.com/nombredebanda"
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-lg pl-9 pr-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition text-sm"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1011,7 +1031,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         <div>
                           <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
-                            Instagram (opcional)
+                            Instagram del músico (opcional)
                           </label>
                           <input
                             type="url"
@@ -1063,7 +1083,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Instagram URL</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Instagram URL (Banda)</label>
                   <input
                     type="url"
                     value={instagramUrl}
