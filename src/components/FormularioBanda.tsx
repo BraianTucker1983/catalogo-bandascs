@@ -73,6 +73,16 @@ const generarTokenAleatorio = () => {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 };
 
+const sanitizarInstagramUrl = (input: string): string => {
+  const limpio = input.trim();
+  if (!limpio) return '';
+  if (limpio.startsWith('http://') || limpio.startsWith('https://')) return limpio;
+  if (limpio.startsWith('instagram.com/')) return `https://${limpio}`;
+  
+  const usuario = limpio.replace(/^@/, '');
+  return `https://instagram.com/${usuario}`;
+};
+
 export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palabraClaveEdicion }) => {
   const [esModoEdicion, setEsModoEdicion] = useState(false);
   const [bandaId, setBandaId] = useState<string | null>(null);
@@ -407,6 +417,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     const emailLimpio = email.trim().toLowerCase();
     const claveLimpia = palabraClave.trim(); 
     const nombreLimpio = nombre.trim();
+    const instagramLimpio = sanitizarInstagramUrl(instagramUrl);
 
     const archivosSubidosStorage: string[] = [];
 
@@ -445,7 +456,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
             color_tema: colorTema,
             url_portada: urlPortadaFinal,
             spotify_url: spotifyUrl.trim(),
-            instagram_url: instagramUrl.trim(),
+            instagram_url: instagramLimpio,
             youtube_url: youtubeUrl.trim(),
           })
           .eq('id', bandaId);
@@ -491,7 +502,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               nombre: integrante.nombre.trim(),
               rol: integrante.rol.trim(),
               foto_url: urlFotoIntegrante,
-              instagram: integrante.instagram?.trim() || null,
+              instagram: integrante.instagram ? sanitizarInstagramUrl(integrante.instagram) : null,
               facebook: integrante.facebook?.trim() || null,
             });
           }
@@ -564,7 +575,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               color_tema: colorTema,
               url_portada: urlPortadaFinal,
               spotify_url: spotifyUrl.trim(),
-              instagram_url: instagramUrl.trim(),
+              instagram_url: instagramLimpio,
               youtube_url: youtubeUrl.trim(),
               aprobado: false
             },
@@ -607,7 +618,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               nombre: integrante.nombre.trim(),
               rol: integrante.rol.trim(),
               foto_url: urlFotoIntegrante,
-              instagram: integrante.instagram?.trim() || null,
+              instagram: integrante.instagram ? sanitizarInstagramUrl(integrante.instagram) : null,
               facebook: integrante.facebook?.trim() || null,
             });
           }
@@ -788,10 +799,10 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                     <InstagramIcon className="w-4 h-4" />
                   </div>
                   <input
-                    type="url"
+                    type="text"
                     value={instagramUrl}
                     onChange={(e) => setInstagramUrl(e.target.value)}
-                    placeholder="https://instagram.com/nombredebanda"
+                    placeholder="@nombredebanda o https://instagram.com/nombredebanda"
                     className="w-full bg-slate-800/50 border border-slate-700 rounded-lg pl-9 pr-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition text-sm"
                   />
                 </div>
@@ -1034,8 +1045,8 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                             Instagram del músico (opcional)
                           </label>
                           <input
-                            type="url"
-                            placeholder="https://instagram.com/..."
+                            type="text"
+                            placeholder="@usuario o link"
                             value={item.instagram || ''}
                             onChange={(e) => actualizarIntegrante(item.id, 'instagram', e.target.value)}
                             className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -1085,10 +1096,10 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Instagram URL (Banda)</label>
                   <input
-                    type="url"
+                    type="text"
                     value={instagramUrl}
                     onChange={(e) => setInstagramUrl(e.target.value)}
-                    placeholder="https://instagram.com/..."
+                    placeholder="@nombredebanda o https://..."
                     className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>

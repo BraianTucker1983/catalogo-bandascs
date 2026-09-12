@@ -12,6 +12,34 @@ const TEMAS_MAPA: Record<string, { primary: string; bgGlow: string }> = {
   lime: { primary: '#84cc16', bgGlow: 'rgba(132, 204, 22, 0.25)' },
 };
 
+// Formatea URLs genéricas asegurando el protocolo https://
+function formatearUrl(url?: string | null): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const urlLimpia = url.trim();
+  if (!urlLimpia) return null;
+  if (urlLimpia.startsWith('http://') || urlLimpia.startsWith('https://')) {
+    return urlLimpia;
+  }
+  return `https://${urlLimpia}`;
+}
+
+// Formatea específicamente enlaces o usuarios de Instagram
+function formatearInstagramUrl(url?: string | null): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const urlLimpia = url.trim();
+  if (!urlLimpia) return null;
+
+  if (urlLimpia.startsWith('http://') || urlLimpia.startsWith('https://')) {
+    return urlLimpia;
+  }
+  if (urlLimpia.startsWith('instagram.com/')) {
+    return `https://${urlLimpia}`;
+  }
+
+  const usuario = urlLimpia.replace(/^@/, '');
+  return `https://instagram.com/${usuario}`;
+}
+
 function asegurarContrasteOscuro(hexColor?: string | null, defaultColor = '#6366f1'): string {
   if (!hexColor) return defaultColor;
   let hex = hexColor.trim();
@@ -64,6 +92,7 @@ interface BandaDetalle {
   instagram_url?: string | null;
   spotify_url?: string | null;
   youtube_url?: string | null;
+  sitio_web?: string | null;
   color_tema?: string | null;
   integrantes?: Integrante[];
   canciones?: Cancion[];
@@ -153,6 +182,12 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
     return { primary: primaryColor, bgGlow: `${primaryColor}40` };
   }, [banda?.color_tema]);
 
+  // URLs Sanitizadas
+  const linkInstagram = formatearInstagramUrl(banda?.instagram_url);
+  const linkSpotify = formatearUrl(banda?.spotify_url);
+  const linkYoutube = formatearUrl(banda?.youtube_url);
+  const linkSitioWeb = formatearUrl(banda?.sitio_web);
+
   if (cargando) {
     return (
       <div className="min-h-[450px] flex flex-col justify-center items-center space-y-4">
@@ -217,11 +252,11 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
             </div>
           )}
 
-          {/* LINK A INSTAGRAM DIRECTO ABAJO DE LA PORTADA */}
-          {banda.instagram_url && (
+          {/* BOTÓN DESTACADO DE INSTAGRAM */}
+          {linkInstagram && (
             <div className="flex justify-center pt-1">
               <a
-                href={banda.instagram_url}
+                href={linkInstagram}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-xs md:text-sm font-bold uppercase tracking-wider px-5 py-2.5 bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white rounded-xl shadow-lg hover:opacity-90 hover:scale-105 transition-all"
@@ -253,11 +288,12 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
             />
           </div>
 
-          {(banda.instagram_url || banda.spotify_url || banda.youtube_url) && (
-            <div className="flex items-center justify-center gap-3 pt-2">
-              {banda.instagram_url && (
+          {/* BOTONES DE REDES Y ENLACES EXTERNOS */}
+          {(linkInstagram || linkSpotify || linkYoutube || linkSitioWeb) && (
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              {linkInstagram && (
                 <a
-                  href={banda.instagram_url}
+                  href={linkInstagram}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs font-bold uppercase tracking-wider px-4 py-2 bg-card border border-border rounded-lg text-white hover:border-primary transition-colors"
@@ -265,9 +301,9 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                   Instagram ↗
                 </a>
               )}
-              {banda.spotify_url && (
+              {linkSpotify && (
                 <a
-                  href={banda.spotify_url}
+                  href={linkSpotify}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs font-bold uppercase tracking-wider px-4 py-2 bg-card border border-border rounded-lg text-emerald-400 hover:border-emerald-500 transition-colors"
@@ -275,14 +311,24 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                   Spotify ↗
                 </a>
               )}
-              {banda.youtube_url && (
+              {linkYoutube && (
                 <a
-                  href={banda.youtube_url}
+                  href={linkYoutube}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs font-bold uppercase tracking-wider px-4 py-2 bg-card border border-border rounded-lg text-rose-400 hover:border-rose-500 transition-colors"
                 >
                   YouTube ↗
+                </a>
+              )}
+              {linkSitioWeb && (
+                <a
+                  href={linkSitioWeb}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold uppercase tracking-wider px-4 py-2 bg-card border border-border rounded-lg text-indigo-400 hover:border-indigo-500 transition-colors"
+                >
+                  Sitio Web ↗
                 </a>
               )}
             </div>
@@ -314,6 +360,8 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                     miembro.nombre || 'Integrante'
                   )}&background=1e293b&color=fff&size=400`;
 
+                const linkMiembroInsta = formatearInstagramUrl(miembro.instagram);
+
                 return (
                   <div
                     key={miembro.id}
@@ -343,9 +391,9 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                       </div>
                     </div>
 
-                    {miembro.instagram && (
+                    {linkMiembroInsta && (
                       <a
-                        href={miembro.instagram}
+                        href={linkMiembroInsta}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs font-semibold hover:underline inline-flex items-center gap-1 transition-colors pt-1"
