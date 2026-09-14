@@ -8,5 +8,5 @@ export default defineConfig({
     tailwindcss(), // <-- 2. Añadimos Tailwind v4 aquí
     react(),
   ],
-  base: '/catalogo-bandascs/', // Mantener tu configuración base intacta
+  base: '/', // Mantener tu configuración base intacta
 })
