@@ -428,8 +428,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         const webpBlob = await convertirAWebp(portadaFile, 1200, 0.85);
         const fileName = `portadas/${crypto.randomUUID()}.webp`;
         
+        // CORREGIDO: Usando 'bandas-images'
         const { error: uploadErr } = await supabase.storage
-          .from('Bandas')
+          .from('bandas-images')
           .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
         if (uploadErr) throw new Error(`Error al subir la portada: ${uploadErr.message}`);
@@ -437,7 +438,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         archivosSubidosStorage.push(fileName);
         
         const { data: publicUrlData } = supabase.storage
-          .from('Bandas')
+          .from('bandas-images')
           .getPublicUrl(fileName);
 
         urlPortadaFinal = publicUrlData.publicUrl;
@@ -460,7 +461,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
             youtube_url: youtubeUrl.trim(),
           })
           .eq('id', bandaId)
-          .eq('palabra_clave', claveLimpia); // <--- AGREGAR ESTA LÍNEA AQUÍ
+          .eq('palabra_clave', claveLimpia);
 
         if (updateErr) throw updateErr;
 
@@ -483,8 +484,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               const webpBlob = await convertirAWebp(integrante.foto_file, 600, 0.8);
               const fileName = `integrantes/${crypto.randomUUID()}.webp`;
 
+              // CORREGIDO: Usando 'bandas-images'
               const { error: uploadIntErr } = await supabase.storage
-                .from('Bandas')
+                .from('bandas-images')
                 .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
               if (uploadIntErr) throw new Error(`Error al subir foto de ${integrante.nombre}`);
@@ -492,7 +494,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               archivosSubidosStorage.push(fileName);
 
               const { data: publicUrlData } = supabase.storage
-                .from('Bandas')
+                .from('bandas-images')
                 .getPublicUrl(fileName);
 
               urlFotoIntegrante = publicUrlData.publicUrl;
@@ -599,8 +601,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               const webpBlob = await convertirAWebp(integrante.foto_file, 600, 0.8);
               const fileName = `integrantes/${crypto.randomUUID()}.webp`;
 
+              // CORREGIDO: Usando 'bandas-images'
               const { error: uploadIntErr } = await supabase.storage
-                .from('Bandas')
+                .from('bandas-images')
                 .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
               if (uploadIntErr) throw new Error(`Error al subir la foto de ${integrante.nombre}`);
@@ -608,7 +611,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               archivosSubidosStorage.push(fileName);
 
               const { data: publicUrlData } = supabase.storage
-                .from('Bandas')
+                .from('bandas-images')
                 .getPublicUrl(fileName);
 
               urlFotoIntegrante = publicUrlData.publicUrl;
