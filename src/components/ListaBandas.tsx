@@ -40,6 +40,13 @@ function asegurarContrasteOscuro(hexColor?: string | null, defaultColor = '#6366
   return hex;
 }
 
+export interface IntegranteResumen {
+  id?: string;
+  nombre?: string | null;
+  rol?: string | null;
+  instrumento?: string | null;
+}
+
 export interface BandaResumen {
   id: string;
   nombre: string;
@@ -49,6 +56,7 @@ export interface BandaResumen {
   url_portada?: string | null;
   color_tema?: string | null;
   aprobado?: boolean | null;
+  integrantes?: IntegranteResumen[] | null;
 }
 
 interface CatalogoBandasProps {
@@ -74,10 +82,10 @@ export default function CatalogoBandas({
         setCargando(true);
         setErrorQuery(null);
 
-        // Trae únicamente las bandas aprobadas por el administrador
+        // Trae únicamente las bandas aprobadas y sus integrantes relacioandos
         const { data, error } = await supabase
           .from('bandas')
-          .select('id, nombre, genero, bio, historia, url_portada, color_tema, aprobado')
+          .select('id, nombre, genero, bio, historia, url_portada, color_tema, aprobado, integrantes(*)')
           .eq('aprobado', true)
           .order('nombre', { ascending: true });
 
@@ -124,11 +132,25 @@ export default function CatalogoBandas({
   }, [bandas]);
 
   const bandasFiltradas = useMemo(() => {
-    return bandas.filter((banda) => {
-      const coincideBusqueda =
-        banda.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        (banda.genero && banda.genero.toLowerCase().includes(busqueda.toLowerCase()));
+    const query = busqueda.toLowerCase().trim();
 
+    return bandas.filter((banda) => {
+      // 1. Coincidencia por nombre de la banda o género
+      const coincideBandaOGenero =
+        banda.nombre.toLowerCase().includes(query) ||
+        (banda.genero && banda.genero.toLowerCase().includes(query));
+
+      // 2. Coincidencia por nombre, rol o instrumento de algún integrante
+      const coincideIntegrante = banda.integrantes?.some((integ) => {
+        const nombreMatch = integ.nombre?.toLowerCase().includes(query);
+        const rolMatch = integ.rol?.toLowerCase().includes(query);
+        const instMatch = integ.instrumento?.toLowerCase().includes(query);
+        return nombreMatch || rolMatch || instMatch;
+      });
+
+      const coincideBusqueda = !query || coincideBandaOGenero || coincideIntegrante;
+
+      // 3. Coincidencia por filtro de género seleccionado
       const coincideGenero =
         generoFiltro === 'todos' ||
         (banda.genero &&

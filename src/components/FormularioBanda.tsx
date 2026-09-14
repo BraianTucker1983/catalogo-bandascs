@@ -459,7 +459,8 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
             instagram_url: instagramLimpio,
             youtube_url: youtubeUrl.trim(),
           })
-          .eq('id', bandaId);
+          .eq('id', bandaId)
+          .eq('palabra_clave', claveLimpia); // <--- AGREGAR ESTA LÍNEA AQUÍ
 
         if (updateErr) throw updateErr;
 

@@ -49,7 +49,7 @@ export function BuscadorSidebar({
   return (
     <aside className="w-full md:w-80 bg-card/40 border-b md:border-b-0 md:border-r border-border/60 p-4 md:p-6 flex flex-col gap-4 md:gap-6 shrink-0 md:h-full overflow-x-hidden md:overflow-y-auto">
       
-      {/* 1. PUBLICIDAD DE RADIOS (AHORA PRIMERO) */}
+      {/* 1. PUBLICIDAD DE RADIOS */}
 
       {/* A) VERSIÓN MÓVIL (COMPACTA) */}
       <div className="block md:hidden bg-amber-500/5 border border-amber-500/20 rounded-xl p-2.5 transition-all">
@@ -172,7 +172,7 @@ export function BuscadorSidebar({
             <div className="flex items-center gap-2 min-w-0">
               <Search className="w-4 h-4 text-primary shrink-0" />
               <span className="text-xs font-medium text-muted-foreground group-hover:text-white truncate">
-                {busqueda ? `"${busqueda}"` : 'Buscar o filtrar por género...'}
+                {busqueda ? `"${busqueda}"` : 'Buscar por banda, integrante, rol...'}
               </span>
             </div>
 
@@ -189,7 +189,7 @@ export function BuscadorSidebar({
         <div className={`${mostrarBuscadorMovil ? 'block' : 'hidden'} md:block relative w-full animate-in fade-in slide-in-from-top-1 duration-200`}>
           <input
             type="text"
-            placeholder="Buscar banda o género..."
+            placeholder="Buscar por banda, integrante o instrumento..."
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
             className="w-full bg-card/80 border border-border/80 rounded-xl pl-3.5 pr-10 py-2.5 text-sm text-white placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-inner"
