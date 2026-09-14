@@ -1,12 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite' // <-- 1. Importamos el compilador nativo v4
+import tailwindcss from '@tailwindcss/vite'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    tailwindcss(), // <-- 2. Añadimos Tailwind v4 aquí
+    tailwindcss(),
     react(),
   ],
-  base: process.env.VERCEL ? '/' : '/catalogo-bandascs/',
+  // Usa la subruta solo si está compilando el Action de GitHub Pages; en Cloudflare usa '/'
+  base: process.env.GITHUB_ACTIONS ? '/catalogo-bandascs/' : '/',
 });
