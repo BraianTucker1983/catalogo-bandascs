@@ -15,25 +15,38 @@ interface AnuncioRadio {
   frecuencia: string;
   slogan: string;
   url: string;
+  instagramUrl?: string;
   imagenFondo?: string;
+}
+
+function InstagramIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
+  );
 }
 
 const RADIOS_PATROCINADORAS: AnuncioRadio[] = [
   {
-    id: 'rad-1',
-    nombre: 'Radio Rock & Pop Local',
-    frecuencia: 'FM 98.5',
-    slogan: 'La voz del rock independiente',
-    url: 'https://ejemplo.com',
-    imagenFondo: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 'rad-2',
-    nombre: 'Estación Cultural',
-    frecuencia: 'FM 102.1',
-    slogan: 'Apoyando la música local',
-    url: 'https://www.radiomega.fm/',
-  },
+    id: 'rock-the-casbah',
+    nombre: 'Rock the Casbah',
+    frecuencia: 'Radio del Parque',
+    slogan: 'El espacio del rock independiente',
+    url: 'https://www.radiodelparque.com.ar/?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAcGRvZgJleHRuA2FlbQIxMQBzcnRjBmFwcF9pZA85MzY2MTk3NDMzOTI0NTkAAafkhhYPPG8JEPrfQ45UozivJwN9AS68ofJPBB8FtxfTia_ZftlfxTIFdlxNTA_aem_PGZv6A2puMYSaUD7zmcbOw',
+    instagramUrl: 'https://www.instagram.com/rockthecasbah2021/',
+    imagenFondo: '/rock-the-casbah-bg.png',
+  },  
 ];
 
 export function BuscadorSidebar({
@@ -56,7 +69,7 @@ export function BuscadorSidebar({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span className="text-xs font-bold text-amber-300">Radios Amigas</span>
+            <span className="text-xs font-bold text-amber-300">Radio Amiga</span>
             <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
               {RADIOS_PATROCINADORAS.length}
             </span>
@@ -72,16 +85,13 @@ export function BuscadorSidebar({
           </button>
         </div>
 
-        {/* Desplegable Móvil con Fondos */}
+        {/* Desplegable Móvil */}
         {desplegarRadiosMobile && (
           <div className="flex flex-col gap-2 mt-3 pt-2.5 border-t border-amber-500/20 animate-in fade-in slide-in-from-top-1 duration-200">
             {RADIOS_PATROCINADORAS.map((radio) => (
-              <a
+              <div
                 key={radio.id}
-                href={radio.url}
-                target="_blank"
-                rel="noreferrer"
-                className="relative overflow-hidden bg-amber-500/10 hover:bg-amber-500/20 p-2.5 rounded-xl flex items-center justify-between gap-2 transition-all border border-amber-500/30 group"
+                className="relative overflow-hidden bg-amber-500/10 p-2.5 rounded-xl flex items-center justify-between gap-3 border border-amber-500/30"
                 style={
                   radio.imagenFondo
                     ? {
@@ -92,37 +102,57 @@ export function BuscadorSidebar({
                     : undefined
                 }
               >
-                <div className="min-w-0 relative z-10">
+                <div className="min-w-0 flex-1 relative z-10">
                   <p className="text-xs font-bold text-white truncate drop-shadow">{radio.nombre}</p>
-                  <p className="text-[10px] text-amber-300/90 drop-shadow">{radio.frecuencia} • {radio.slogan}</p>
+                  <p className="text-[10px] text-amber-300/90 drop-shadow truncate">{radio.frecuencia} • {radio.slogan}</p>
                 </div>
-                <ExternalLink className="w-3.5 h-3.5 text-amber-400 shrink-0 relative z-10" />
-              </a>
+                
+                {/* Botones verticales */}
+                <div className="flex flex-col justify-center gap-1.5 relative z-10 shrink-0">
+                  {radio.instagramUrl && (
+                    <a
+                      href={radio.instagramUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Instagram"
+                      className="p-1.5 bg-slate-900/80 hover:bg-pink-600/80 rounded-lg text-pink-400 hover:text-white transition-colors border border-amber-500/20 flex items-center justify-center"
+                    >
+                      <InstagramIcon className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                  <a
+                    href={radio.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Ir a la Radio"
+                    className="p-1.5 bg-slate-900/80 hover:bg-amber-500/80 rounded-lg text-amber-400 hover:text-slate-950 transition-colors border border-amber-500/20 flex items-center justify-center"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* B) VERSIÓN DESKTOP (TARJETA COMPLETA CON FONDOS) */}
+      {/* B) VERSIÓN DESKTOP */}
       <div className="hidden md:flex bg-card/60 border border-border/80 rounded-2xl p-5 shadow-lg flex-col gap-4 backdrop-blur-md">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
             <Radio className="w-3.5 h-3.5 animate-pulse" />
-            <span>Radios Amigas</span>
+            <span>Radio Amiga</span>
           </h2>
-          <span className="text-[9px] uppercase tracking-widest text-amber-400/70 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+          {/* <span className="text-[9px] uppercase tracking-widest text-amber-400/70 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
             Sponsors
-          </span>
+          </span> */}
         </div>
 
         <div className="flex flex-col gap-2.5">
           {RADIOS_PATROCINADORAS.map((radio) => (
-            <a
+            <div
               key={radio.id}
-              href={radio.url}
-              target="_blank"
-              rel="noreferrer"
-              className="group relative overflow-hidden bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/20 hover:border-amber-500/50 p-3.5 rounded-xl transition-all duration-300 flex items-center justify-between gap-2.5 shadow-md hover:shadow-amber-500/10 hover:-translate-y-0.5"
+              className="group relative overflow-hidden bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/20 hover:border-amber-500/50 p-3 rounded-xl transition-all duration-300 flex items-center justify-between gap-3 shadow-md hover:shadow-amber-500/10"
               style={
                 radio.imagenFondo
                   ? {
@@ -133,8 +163,9 @@ export function BuscadorSidebar({
                   : undefined
               }
             >
-              <div className="min-w-0 flex-1 relative z-10">
-                <div className="flex items-center gap-1.5">
+              {/* Información textual */}
+              <div className="min-w-0 flex-1 relative z-10 flex flex-col justify-center">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors truncate drop-shadow-md">
                     {radio.nombre}
                   </span>
@@ -142,26 +173,46 @@ export function BuscadorSidebar({
                     {radio.frecuencia}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-300 truncate mt-0.5 drop-shadow">
+                <p className="text-[11px] text-slate-300 truncate mt-1 drop-shadow">
                   {radio.slogan}
                 </p>
               </div>
 
-              <ExternalLink className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-300 shrink-0 transition-colors relative z-10" />
-            </a>
+              {/* Botones de acción organizados en columna */}
+              <div className="flex flex-col justify-center gap-1.5 relative z-10 shrink-0">
+                {radio.instagramUrl && (
+                  <a
+                    href={radio.instagramUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Ver Instagram"
+                    className="p-1.5 bg-slate-950/80 hover:bg-pink-600 text-pink-400 hover:text-white rounded-lg transition-colors border border-amber-500/20 flex items-center justify-center"
+                  >
+                    <InstagramIcon className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                <a
+                  href={radio.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Visitar sitio de la Radio"
+                  className="p-1.5 bg-slate-950/80 hover:bg-amber-500 text-amber-400 hover:text-slate-950 rounded-lg transition-colors border border-amber-500/20 flex items-center justify-center"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
           ))}
         </div>
       </div>
 
       {/* 2. SECCIÓN DE BÚSQUEDA Y FILTROS */}
       <div className="relative flex flex-col gap-3">
-        {/* Título en Desktop */}
         <h2 className="hidden md:flex text-xs font-extrabold uppercase tracking-wider text-muted-foreground mb-1 items-center gap-1.5">
           <Search className="w-3.5 h-3.5 text-primary" />
           <span>Explorar</span>
         </h2>
 
-        {/* Botón Minimizado para Móvil */}
         {!mostrarBuscadorMovil && (
           <button
             type="button"
@@ -176,7 +227,6 @@ export function BuscadorSidebar({
               </span>
             </div>
 
-            {/* Badge de género seleccionado al estar minimizado */}
             {generoFiltro && (
               <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-md shrink-0 ml-2">
                 {generoFiltro}
@@ -185,7 +235,6 @@ export function BuscadorSidebar({
           </button>
         )}
 
-        {/* Input de Búsqueda */}
         <div className={`${mostrarBuscadorMovil ? 'block' : 'hidden'} md:block relative w-full animate-in fade-in slide-in-from-top-1 duration-200`}>
           <input
             type="text"
@@ -196,7 +245,6 @@ export function BuscadorSidebar({
             autoFocus={mostrarBuscadorMovil}
           />
           
-          {/* Botón para cerrar la búsqueda y filtros en móvil */}
           {mostrarBuscadorMovil && (
             <button
               type="button"
