@@ -76,7 +76,7 @@ export default function Footer({
               />        
             </button>
             <p className="text-xs leading-relaxed text-muted-foreground max-w-sm">
-              Archivo histórico y registro cultural de la escena musical de Coronel Suárez.
+              Archivo histórico y registro cultural de la escena musical de Coronel Suárez y toda la zona.
             </p>
           </div>
 
@@ -98,27 +98,14 @@ export default function Footer({
                   <span className="animate-bounce">🎸</span>
                   <span>Inscribir mi Banda o modificar datos</span>
                 </div>
-              </button>
-              {/* <p className="text-xs leading-relaxed text-muted-foreground">
-              Actualizá los datos de tu banda.
-            </p>
-              <button
-                type="button"
-                onClick={() => onNavegar('editar')}
-                className="relative p-[1.5px] rounded-full bg-gradient-to-r from-primary via-emerald-400 to-primary transition-all hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-primary/20 cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-background text-white font-bold text-xs uppercase tracking-wider hover:bg-background/80 transition-colors">
-                  <Edit3 className="w-3.5 h-3.5 text-primary" />
-                  <span>Modificar Datos</span>
-                </div>
-              </button> */}
+              </button>              
             </div>
           </div>
 
           {/* Columna 3: Información cultural / Localidad */}
           <div className="space-y-3">
             <h4 className="text-sm font-bold uppercase tracking-wider text-white">
-              Escena Local
+              Escena Regional
             </h4>
             <p className="text-xs text-muted-foreground">
               Coronel Suárez, Buenos Aires.
@@ -135,7 +122,7 @@ export default function Footer({
         <div className="border-t border-border/50 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
 
           <p className="text-white/40">
-            © {new Date().getFullYear()} Catálogo de Bandas CS. Todos los derechos reservados.
+            © {new Date().getFullYear()} Catálogo de Bandas. Todos los derechos reservados.
           </p>
 
           {/* Área sutil de Administración */}
