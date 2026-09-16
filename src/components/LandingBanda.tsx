@@ -291,7 +291,7 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
           {/* BOTONES DE REDES Y ENLACES EXTERNOS */}
           {(linkInstagram || linkSpotify || linkYoutube || linkSitioWeb) && (
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              {linkInstagram && (
+              {/* {linkInstagram && (
                 <a
                   href={linkInstagram}
                   target="_blank"
@@ -300,7 +300,7 @@ export default function LandingBanda({ bandaId, onVolver }: LandingBandaProps) {
                 >
                   Instagram ↗
                 </a>
-              )}
+              )} */}
               {linkSpotify && (
                 <a
                   href={linkSpotify}
