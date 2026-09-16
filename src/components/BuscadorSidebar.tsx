@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Radio, ExternalLink, Search, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Radio, ExternalLink, Search, X } from 'lucide-react';
 
 interface BuscadorSidebarProps {
   busqueda: string;
@@ -56,7 +56,6 @@ export function BuscadorSidebar({
   generoFiltro,
   onGeneroChange,
 }: BuscadorSidebarProps) {
-  const [desplegarRadiosMobile, setDesplegarRadiosMobile] = useState(false);
   const [mostrarBuscadorMovil, setMostrarBuscadorMovil] = useState(false);
 
   return (
@@ -64,76 +63,62 @@ export function BuscadorSidebar({
       
       {/* 1. PUBLICIDAD DE RADIOS */}
 
-      {/* A) VERSIÓN MÓVIL (COMPACTA) */}
-      <div className="block md:hidden bg-amber-500/5 border border-amber-500/20 rounded-xl p-2.5 transition-all">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span className="text-xs font-bold text-amber-300">Radio Amiga</span>
-            <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-              {RADIOS_PATROCINADORAS.length}
-            </span>
-          </div>
-          
-          <button
-            type="button"
-            onClick={() => setDesplegarRadiosMobile(!desplegarRadiosMobile)}
-            className="text-[11px] font-bold text-amber-400 flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-          >
-            {desplegarRadiosMobile ? 'Ocultar' : 'Escuchar'}
-            {desplegarRadiosMobile ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
+      {/* A) VERSIÓN MÓVIL (SIEMPRE VISIBLE) */}
+      <div className="block md:hidden bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 transition-all">
+        <div className="flex items-center gap-2 mb-2.5">
+          <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+          <span className="text-xs font-bold text-amber-300">Radio Amiga</span>
+          <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+            {RADIOS_PATROCINADORAS.length}
+          </span>
         </div>
 
-        {/* Desplegable Móvil */}
-        {desplegarRadiosMobile && (
-          <div className="flex flex-col gap-2 mt-3 pt-2.5 border-t border-amber-500/20 animate-in fade-in slide-in-from-top-1 duration-200">
-            {RADIOS_PATROCINADORAS.map((radio) => (
-              <div
-                key={radio.id}
-                className="relative overflow-hidden bg-amber-500/10 p-2.5 rounded-xl flex items-center justify-between gap-3 border border-amber-500/30"
-                style={
-                  radio.imagenFondo
-                    ? {
-                        backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.75)), url(${radio.imagenFondo})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }
-                    : undefined
-                }
-              >
-                <div className="min-w-0 flex-1 relative z-10">
-                  <p className="text-xs font-bold text-white truncate drop-shadow">{radio.nombre}</p>
-                  <p className="text-[10px] text-amber-300/90 drop-shadow truncate">{radio.frecuencia} • {radio.slogan}</p>
-                </div>
-                
-                {/* Botones verticales */}
-                <div className="flex flex-col justify-center gap-1.5 relative z-10 shrink-0">
-                  {radio.instagramUrl && (
-                    <a
-                      href={radio.instagramUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Instagram"
-                      className="p-1.5 bg-slate-900/80 hover:bg-pink-600/80 rounded-lg text-pink-400 hover:text-white transition-colors border border-amber-500/20 flex items-center justify-center"
-                    >
-                      <InstagramIcon className="w-3.5 h-3.5" />
-                    </a>
-                  )}
+        <div className="flex flex-col gap-2 pt-2 border-t border-amber-500/20">
+          {RADIOS_PATROCINADORAS.map((radio) => (
+            <div
+              key={radio.id}
+              className="relative overflow-hidden bg-amber-500/10 p-2.5 rounded-xl flex items-center justify-between gap-3 border border-amber-500/30"
+              style={
+                radio.imagenFondo
+                  ? {
+                      backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.75)), url(${radio.imagenFondo})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }
+                  : undefined
+              }
+            >
+              <div className="min-w-0 flex-1 relative z-10">
+                <p className="text-xs font-bold text-white truncate drop-shadow">{radio.nombre}</p>
+                <p className="text-[10px] text-amber-300/90 drop-shadow truncate">{radio.frecuencia} • {radio.slogan}</p>
+              </div>
+              
+              {/* Botones verticales */}
+              <div className="flex flex-col justify-center gap-1.5 relative z-10 shrink-0">
+                {radio.instagramUrl && (
                   <a
-                    href={radio.url}
+                    href={radio.instagramUrl}
                     target="_blank"
                     rel="noreferrer"
-                    title="Ir a la Radio"
-                    className="p-1.5 bg-slate-900/80 hover:bg-amber-500/80 rounded-lg text-amber-400 hover:text-slate-950 transition-colors border border-amber-500/20 flex items-center justify-center"
+                    title="Instagram"
+                    className="p-1.5 bg-slate-900/80 hover:bg-pink-600/80 rounded-lg text-pink-400 hover:text-white transition-colors border border-amber-500/20 flex items-center justify-center"
                   >
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <InstagramIcon className="w-3.5 h-3.5" />
                   </a>
-                </div>
+                )}
+                <a
+                  href={radio.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Ir a la Radio"
+                  className="p-1.5 bg-slate-900/80 hover:bg-amber-500/80 rounded-lg text-amber-400 hover:text-slate-950 transition-colors border border-amber-500/20 flex items-center justify-center"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* B) VERSIÓN DESKTOP */}
@@ -143,9 +128,6 @@ export function BuscadorSidebar({
             <Radio className="w-3.5 h-3.5 animate-pulse" />
             <span>Radio Amiga</span>
           </h2>
-          {/* <span className="text-[9px] uppercase tracking-widest text-amber-400/70 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-            Sponsors
-          </span> */}
         </div>
 
         <div className="flex flex-col gap-2.5">

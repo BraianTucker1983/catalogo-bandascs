@@ -168,7 +168,7 @@ export default function CatalogoBandas({
     <div className="w-full flex flex-col bg-background text-foreground rounded-2xl border border-border/40 overflow-hidden shadow-xl">
       <header className="shrink-0 border-b border-border/60 bg-card/20 px-6 py-4 flex items-center justify-between z-10">
         <div>
-          <h1 className="text-xl font-black uppercase tracking-tight text-white">
+          <h1 className="text-xl font-black uppercase tracking-tight text-white sr-only">
             Catálogo de Bandas
           </h1>
           <p className="text-muted-foreground text-xs mt-0.5">
@@ -231,7 +231,7 @@ export default function CatalogoBandas({
                   <div
                     key={banda.id}
                     onClick={() => onSeleccionarBanda(banda.id)}
-                    className="group bg-card/40 border border-border/80 rounded-2xl overflow-hidden backdrop-blur-sm hover:border-primary/60 transition-all duration-300 flex flex-col sm:flex-row items-center cursor-pointer shadow-md hover:shadow-xl hover:-translate-y-0.5"
+                    className="group bg-slate-900 border border-border/80 rounded-2xl overflow-hidden backdrop-blur-sm hover:border-primary/60 transition-all duration-300 flex flex-col sm:flex-row items-center cursor-pointer shadow-md hover:shadow-xl hover:-translate-y-0.5"
                   >
                     <div className="relative w-full sm:w-40 h-36 sm:h-36 bg-slate-950 overflow-hidden shrink-0">
                       {banda.url_portada ? (
