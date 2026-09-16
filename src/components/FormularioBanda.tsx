@@ -20,10 +20,11 @@ import {
   RefreshCw,
   Copy,
   Check,
-  Search
+  Search,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
-// SVG Nativo de Instagram para evitar errores con versiones viejas de lucide-react
 const InstagramIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
   <svg 
     className={className} 
@@ -73,6 +74,15 @@ const generarTokenAleatorio = () => {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 };
 
+const generarHash = async (texto: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(texto.trim().toLowerCase());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
 const sanitizarInstagramUrl = (input: string): string => {
   const limpio = input.trim();
   if (!limpio) return '';
@@ -91,13 +101,13 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [palabraClave, setPalabraClave] = useState(generarTokenAleatorio());
+  const [mostrarClave, setMostrarClave] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [genero, setGenero] = useState<string[]>([]);
   const [bio, setBio] = useState('');
   const [historia, setHistoria] = useState('');
   const [colorTema, setColorTema] = useState('#6366f1');
 
-  // REDES SOCIALES DE LA BANDA
   const [spotifyUrl, setSpotifyUrl] = useState('');
   const [instagramUrl, setInstagramUrl] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -144,10 +154,12 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     setMensajeEstado(null);
 
     try {
+      const claveHash = await generarHash(claveABuscar);
+
       const { data, error } = await supabase
         .from('bandas')
         .select('*, integrantes(*), canciones(*)')
-        .eq('palabra_clave', claveABuscar.trim())
+        .eq('palabra_clave', claveHash)
         .maybeSingle();
 
       if (error) throw error;
@@ -160,11 +172,19 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         return;
       }
 
+      if (data.email_verificado === false) {
+        setMensajeEstado({
+          tipo: 'error',
+          texto: 'Esta cuenta aún no ha verificado su correo electrónico. Revisa tu bandeja de entrada para activarla.',
+        });
+        return;
+      }
+
       setBandaId(data.id);
       setEsModoEdicion(true);
       setNombre(data.nombre || '');
       setEmail(data.email || '');
-      setPalabraClave(data.palabra_clave || claveABuscar);
+      setPalabraClave(claveABuscar);
       setBio(data.bio || '');
       setHistoria(data.historia || '');
       setColorTema(data.color_tema || '#6366f1');
@@ -208,7 +228,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
 
       setMensajeEstado({
         tipo: 'exito',
-        texto: `¡Datos de "${data.nombre}" cargados en modo edición! Modifica los campos que desees.`,
+        texto: `¡Datos de "${data.nombre}" cargados en modo edición!`,
       });
 
     } catch (err: any) {
@@ -219,6 +239,83 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
       });
     } finally {
       setCargandoDatos(false);
+    }
+  };
+
+  const recuperarPalabraClave = async () => {
+    if (!email.trim() || !email.includes('@')) {
+      setMensajeEstado({
+        tipo: 'error',
+        texto: 'Escribe tu correo electrónico en el campo superior para enviarte tu nueva palabra clave.',
+      });
+      return;
+    }
+
+    setLoading(true);
+    setMensajeEstado(null);
+
+    try {
+      const emailLimpio = email.trim().toLowerCase();
+
+      const { data: banda, error: fetchError } = await supabase
+        .from('bandas')
+        .select('id, nombre')
+        .eq('email', emailLimpio)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (!banda) {
+        setMensajeEstado({
+          tipo: 'error',
+          texto: 'No encontramos ninguna banda registrada con este correo electrónico.',
+        });
+        return;
+      }
+
+      const nuevaClave = generarTokenAleatorio();
+      const nuevaClaveHash = await generarHash(nuevaClave);
+
+      const { error: updateError } = await supabase
+        .from('bandas')
+        .update({ palabra_clave: nuevaClaveHash })
+        .eq('id', banda.id);
+
+      if (updateError) throw updateError;
+
+      const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+      const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+      if (serviceId && templateId && publicKey) {
+        await emailjs.send(
+          serviceId,
+          templateId,
+          {
+            to_email: emailLimpio,
+            nombre_banda: banda.nombre,
+            clave: nuevaClave,
+            fecha_registro: new Date().toLocaleString('es-AR'),
+          },
+          publicKey
+        );
+      }
+
+      setPalabraClave(nuevaClave);
+
+      setMensajeEstado({
+        tipo: 'exito',
+        texto: `¡Nueva palabra clave enviada a ${emailLimpio}! Revisa tu correo e ingrésala para acceder.`,
+      });
+
+    } catch (err: any) {
+      console.error('Error al restablecer palabra clave:', err);
+      setMensajeEstado({
+        tipo: 'error',
+        texto: 'Ocurrió un error al intentar generar la nueva palabra clave.',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -363,15 +460,17 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     });
   };
 
-  const enviarEmailNotificacion = async (nombreBanda: string, emailDestino: string, clave: string) => {
+  const enviarEmailNotificacion = async (
+    nombreBanda: string, 
+    emailDestino: string, 
+    clave: string,
+    linkVerificacion: string
+  ) => {
     const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
     const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
     const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
-    if (!serviceId || !templateId || !publicKey) {
-      console.warn('EmailJS no está configurado correctamente en las variables de entorno.');
-      return;
-    }
+    if (!serviceId || !templateId || !publicKey) return;
 
     try {
       await emailjs.send(
@@ -381,6 +480,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           to_email: emailDestino,
           nombre_banda: nombreBanda,
           clave: clave,
+          link_verificacion: linkVerificacion,
           fecha_registro: new Date().toLocaleString('es-AR'),
         },
         publicKey
@@ -419,23 +519,19 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     const nombreLimpio = nombre.trim();
     const instagramLimpio = sanitizarInstagramUrl(instagramUrl);
 
-    const archivosSubidosStorage: string[] = [];
-
     try {
+      const claveHash = await generarHash(claveLimpia);
       let urlPortadaFinal: string | null = portadaPreview; 
 
       if (portadaFile) {
         const webpBlob = await convertirAWebp(portadaFile, 1200, 0.85);
         const fileName = `portadas/${crypto.randomUUID()}.webp`;
         
-        // CORREGIDO: Usando 'bandas-images'
         const { error: uploadErr } = await supabase.storage
           .from('bandas-images')
           .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
         if (uploadErr) throw new Error(`Error al subir la portada: ${uploadErr.message}`);
-        
-        archivosSubidosStorage.push(fileName);
         
         const { data: publicUrlData } = supabase.storage
           .from('bandas-images')
@@ -450,7 +546,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           .update({
             nombre: nombreLimpio,
             email: emailLimpio,
-            palabra_clave: claveLimpia,
+            palabra_clave: claveHash,
             genero: genero.join(', '),
             bio: bio.trim(),
             historia: historia.trim(),
@@ -460,17 +556,11 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
             instagram_url: instagramLimpio,
             youtube_url: youtubeUrl.trim(),
           })
-          .eq('id', bandaId)
-          .eq('palabra_clave', claveLimpia);
+          .eq('id', bandaId);
 
         if (updateErr) throw updateErr;
 
-        const { error: deleteIntErr } = await supabase
-          .from('integrantes')
-          .delete()
-          .eq('banda_id', bandaId);
-
-        if (deleteIntErr) throw new Error(`Error al actualizar integrantes: ${deleteIntErr.message}`);
+        await supabase.from('integrantes').delete().eq('banda_id', bandaId);
 
         if (integrantes.length > 0) {
           const integrantesParaInsertar = [];
@@ -484,14 +574,11 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               const webpBlob = await convertirAWebp(integrante.foto_file, 600, 0.8);
               const fileName = `integrantes/${crypto.randomUUID()}.webp`;
 
-              // CORREGIDO: Usando 'bandas-images'
               const { error: uploadIntErr } = await supabase.storage
                 .from('bandas-images')
                 .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
               if (uploadIntErr) throw new Error(`Error al subir foto de ${integrante.nombre}`);
-              
-              archivosSubidosStorage.push(fileName);
 
               const { data: publicUrlData } = supabase.storage
                 .from('bandas-images')
@@ -511,20 +598,11 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           }
 
           if (integrantesParaInsertar.length > 0) {
-            const { error: intInsertErr } = await supabase
-              .from('integrantes')
-              .insert(integrantesParaInsertar);
-
-            if (intInsertErr) throw new Error(`Error al guardar integrantes: ${intInsertErr.message}`);
+            await supabase.from('integrantes').insert(integrantesParaInsertar);
           }
         }
 
-        const { error: deleteCancErr } = await supabase
-          .from('canciones')
-          .delete()
-          .eq('banda_id', bandaId);
-
-        if (deleteCancErr) throw new Error(`Error al actualizar canciones: ${deleteCancErr.message}`);
+        await supabase.from('canciones').delete().eq('banda_id', bandaId);
 
         const cancionesValidas = canciones
           .filter((c) => c.titulo.trim() !== '')
@@ -536,11 +614,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           }));
 
         if (cancionesValidas.length > 0) {
-          const { error: cancErr } = await supabase
-            .from('canciones')
-            .insert(cancionesValidas);
-
-          if (cancErr) throw new Error(`Error al guardar canciones: ${cancErr.message}`);
+          await supabase.from('canciones').insert(cancionesValidas);
         }
 
         setMensajeEstado({ 
@@ -558,12 +632,16 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         if (existeBanda) {
           setMensajeEstado({
             tipo: 'error',
-            texto: `La banda "${nombreLimpio}" ya se encuentra registrada en el Catálogo. Si eres integrante, utiliza tu palabra clave para modificar sus datos.`,
+            texto: `La banda "${nombreLimpio}" ya se encuentra registrada. Si eres integrante, utiliza tu palabra clave para modificar sus datos.`,
           });
           setPasoActual(1);
           setLoading(false);
           return;
         }
+
+        const tokenVerificacion = crypto.randomUUID();
+        const tokenVerificacionHash = await generarHash(tokenVerificacion);
+        const tokenExpiraEn = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
         const { data: bandaData, error: bandaErr } = await supabase
           .from('bandas')
@@ -571,7 +649,10 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
             {
               nombre: nombreLimpio,
               email: emailLimpio,
-              palabra_clave: claveLimpia,
+              palabra_clave: claveHash,
+              token_verificacion_hash: tokenVerificacionHash,
+              token_expira_en: tokenExpiraEn,
+              email_verificado: false,
               genero: genero.join(', '),
               bio: bio.trim(),
               historia: historia.trim(),
@@ -601,14 +682,11 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               const webpBlob = await convertirAWebp(integrante.foto_file, 600, 0.8);
               const fileName = `integrantes/${crypto.randomUUID()}.webp`;
 
-              // CORREGIDO: Usando 'bandas-images'
               const { error: uploadIntErr } = await supabase.storage
                 .from('bandas-images')
                 .upload(fileName, webpBlob, { contentType: 'image/webp', upsert: true });
 
               if (uploadIntErr) throw new Error(`Error al subir la foto de ${integrante.nombre}`);
-              
-              archivosSubidosStorage.push(fileName);
 
               const { data: publicUrlData } = supabase.storage
                 .from('bandas-images')
@@ -628,11 +706,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           }
 
           if (integrantesParaInsertar.length > 0) {
-            const { error: intInsertErr } = await supabase
-              .from('integrantes')
-              .insert(integrantesParaInsertar);
-
-            if (intInsertErr) throw new Error(`Error al guardar integrantes: ${intInsertErr.message}`);
+            await supabase.from('integrantes').insert(integrantesParaInsertar);
           }
         }
 
@@ -646,23 +720,20 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           }));
 
         if (cancionesValidas.length > 0) {
-          const { error: cancErr } = await supabase
-            .from('canciones')
-            .insert(cancionesValidas);
-
-          if (cancErr) throw new Error(`Error al guardar canciones: ${cancErr.message}`);
+          await supabase.from('canciones').insert(cancionesValidas);
         }
 
-        await enviarEmailNotificacion(nombreLimpio, emailLimpio, claveLimpia);
+        const linkVerificacion = `${window.location.origin}/validar-email?token=${tokenVerificacion}&id=${bandaIdCreada}`;
+        await enviarEmailNotificacion(nombreLimpio, emailLimpio, claveLimpia, linkVerificacion);
 
         setMensajeEstado({ 
           tipo: 'exito', 
-          texto: `¡Banda registrada con éxito! Te enviamos tu palabra clave (${claveLimpia}) al correo guardado.` 
+          texto: `¡Banda registrada con éxito! Te enviamos un correo a ${emailLimpio} con el enlace de confirmación y tu palabra clave (${claveLimpia}).` 
         });
       }
 
       if (onSuccess) {
-        setTimeout(onSuccess, 2500);
+        setTimeout(onSuccess, 3000);
       }
 
     } catch (err: any) {
@@ -670,7 +741,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
       let textoError = err.message || 'Ocurrió un error inesperado. Por favor reintenta.';
 
       if (err.code === '23505' || err.message?.includes('bandas_nombre_unique_idx')) {
-        textoError = `La banda "${nombreLimpio}" ya se encuentra registrada. Si eres integrante de esta banda, utiliza tu palabra clave para modificar sus datos.`;
+        textoError = `La banda "${nombreLimpio}" ya se encuentra registrada. Utiliza tu palabra clave para modificar sus datos.`;
         setPasoActual(1);
       }
 
@@ -829,6 +900,17 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                     required
                   />
                 </div>
+
+                <div className="mt-1.5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={recuperarPalabraClave}
+                    disabled={loading}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline transition bg-transparent border-0 p-0 cursor-pointer disabled:opacity-50"
+                  >
+                    ¿Olvidaste tu palabra clave?
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -836,16 +918,24 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                   Palabra Clave / Token de Edición <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative flex items-center">
-                  <Key className="w-4 h-4 text-indigo-400 absolute left-3" />
+                  <Key className="w-4 h-4 text-indigo-400 absolute left-3 z-10 pointer-events-none" />
                   <input
-                    type="text"
+                    type={mostrarClave ? "text" : "password"}
                     value={palabraClave}
                     onChange={(e) => setPalabraClave(e.target.value)}
-                    className="w-full bg-indigo-950/40 border border-indigo-500/40 rounded-lg pl-9 pr-28 py-2.5 text-indigo-200 font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full bg-indigo-950/40 border border-indigo-500/40 rounded-lg pl-9 pr-36 py-2.5 text-indigo-200 font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                     required
                   />
                   
-                  <div className="absolute right-2 flex items-center gap-1">
+                  <div className="absolute right-2 flex items-center gap-1 z-10">
+                    <button
+                      type="button"
+                      onClick={() => setMostrarClave(!mostrarClave)}
+                      title={mostrarClave ? "Ocultar clave" : "Mostrar clave"}
+                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition"
+                    >
+                      {mostrarClave ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                     <button
                       type="button"
                       onClick={() => cargarBandaPorClave(palabraClave)}
@@ -875,7 +965,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                   </div>
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  Ingresa tu palabra clave y haz clic en <strong>"Cargar"</strong> para recuperar la información de tu banda.
+                  Ingresa tu palabra clave y haz clic en <strong>"Cargar"</strong> para editar tus datos.
                 </span>
               </div>
             </div>
