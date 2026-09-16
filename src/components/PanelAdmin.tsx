@@ -10,8 +10,12 @@ import {
   Mail, 
   Music2, 
   Lock, 
-  Sparkles,
-  Inbox
+  Inbox,
+  Eye,
+  EyeOff,
+  LogOut,
+  KeyRound,
+  ArrowLeft
 } from 'lucide-react';
 
 interface BandaPendiente {
@@ -29,6 +33,14 @@ export default function AdminPanel() {
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
   const [autenticado, setAutenticado] = useState(false);
 
+  // Estados para inicio de sesión y recuperación
+  const [emailAdmin, setEmailAdmin] = useState('');
+  const [passwordAdmin, setPasswordAdmin] = useState('');
+  const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [cargandoAuth, setCargandoAuth] = useState(false);
+  const [modoRecuperar, setModoRecuperar] = useState(false);
+  const [mensajeAuth, setMensajeAuth] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
+
   useEffect(() => {
     const verificarSesion = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -43,6 +55,21 @@ export default function AdminPanel() {
     };
 
     verificarSesion();
+
+    // Escuchar cambios de estado de autenticación (Login / Logout / Recovery)
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setAutenticado(true);
+        obtenerBandasPendientes();
+      } else {
+        setAutenticado(false);
+        setBandas([]);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const obtenerBandasPendientes = async () => {
@@ -61,6 +88,66 @@ export default function AdminPanel() {
     } finally {
       setCargando(false);
     }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCargandoAuth(true);
+    setMensajeAuth(null);
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailAdmin.trim(),
+        password: passwordAdmin,
+      });
+
+      if (error) throw error;
+
+      setEmailAdmin('');
+      setPasswordAdmin('');
+    } catch (err: any) {
+      setMensajeAuth({
+        tipo: 'error',
+        texto: err.message === 'Invalid login credentials' 
+          ? 'Credenciales incorrectas. Verifica tu correo y contraseña.' 
+          : err.message,
+      });
+    } finally {
+      setCargandoAuth(false);
+    }
+  };
+
+  const handleRecuperarPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailAdmin.trim()) {
+      setMensajeAuth({ tipo: 'error', texto: 'Ingresa tu correo electrónico de administrador.' });
+      return;
+    }
+
+    setCargandoAuth(true);
+    setMensajeAuth(null);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(emailAdmin.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      setMensajeAuth({
+        tipo: 'exito',
+        texto: `Se ha enviado un correo de recuperación a ${emailAdmin}. Revisa tu bandeja de entrada.`,
+      });
+    } catch (err: any) {
+      setMensajeAuth({ tipo: 'error', texto: `Error al solicitar recuperación: ${err.message}` });
+    } finally {
+      setCargandoAuth(false);
+    }
+  };
+
+  const handleCerrarSesion = async () => {
+    await supabase.auth.signOut();
+    setAutenticado(false);
   };
 
   const handleAprobarBanda = async (id: string, nombreBanda: string) => {
@@ -100,17 +187,130 @@ export default function AdminPanel() {
     }
   };
 
-  // VISTA DE ACCESO RESTRENGIDO SI NO ESTÁ AUTENTICADO
+  // VISTA DE FORMULARIO DE ACCESO / RECUPERACIÓN SI NO ESTÁ AUTENTICADO
   if (!cargando && !autenticado) {
     return (
-      <div className="max-w-md mx-auto my-16 p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-center">
-        <div className="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-full flex items-center justify-center text-xl mx-auto mb-4 border border-rose-500/20">
-          <Lock className="w-6 h-6" />
+      <div className="max-w-md mx-auto my-16 p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-left">
+        <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center text-xl mx-auto mb-4 border border-indigo-500/20">
+          {modoRecuperar ? <KeyRound className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
         </div>
-        <h3 className="text-xl font-bold text-white mb-2">Acceso Restringido</h3>
-        <p className="text-slate-400 text-sm">
-          Debes iniciar sesión como administrador para gestionar las postulaciones del catálogo.
+
+        <h3 className="text-xl font-bold text-white mb-1 text-center">
+          {modoRecuperar ? 'Recuperar Contraseña Admin' : 'Acceso Administrador'}
+        </h3>
+        <p className="text-slate-400 text-xs mb-6 text-center">
+          {modoRecuperar
+            ? 'Ingresa tu correo para recibir un enlace seguro de restablecimiento.'
+            : 'Inicia sesión con tus credenciales de administrador.'}
         </p>
+
+        {mensajeAuth && (
+          <div className={`mb-5 p-3 rounded-lg flex items-center gap-2.5 text-xs font-medium ${
+            mensajeAuth.tipo === 'exito'
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+              : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+          }`}>
+            {mensajeAuth.tipo === 'exito' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+            <p>{mensajeAuth.texto}</p>
+          </div>
+        )}
+
+        {modoRecuperar ? (
+          <form onSubmit={handleRecuperarPassword} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Correo Electrónico</label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <input
+                  type="email"
+                  value={emailAdmin}
+                  onChange={(e) => setEmailAdmin(e.target.value)}
+                  placeholder="admin@catalogo.com"
+                  className="w-full bg-slate-800/60 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={cargandoAuth}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {cargandoAuth ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enviar Enlace de Recuperación'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setModoRecuperar(false);
+                setMensajeAuth(null);
+              }}
+              className="w-full text-xs text-slate-400 hover:text-white transition flex items-center justify-center gap-1 pt-2"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Volver al Inicio de Sesión
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Correo Electrónico</label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <input
+                  type="email"
+                  value={emailAdmin}
+                  onChange={(e) => setEmailAdmin(e.target.value)}
+                  placeholder="admin@catalogo.com"
+                  className="w-full bg-slate-800/60 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Contraseña</label>
+              <div className="relative">
+                <input
+                  type={mostrarPassword ? 'text' : 'password'}
+                  value={passwordAdmin}
+                  onChange={(e) => setPasswordAdmin(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-800/60 border border-slate-700 rounded-lg pl-3 pr-10 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarPassword(!mostrarPassword)}
+                  className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 transition"
+                >
+                  {mostrarPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setModoRecuperar(true);
+                  setMensajeAuth(null);
+                }}
+                className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline transition"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={cargandoAuth}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-indigo-900/30"
+            >
+              {cargandoAuth ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ingresar al Panel'}
+            </button>
+          </form>
+        )}
       </div>
     );
   }
@@ -129,15 +329,25 @@ export default function AdminPanel() {
               Panel de Revisión
             </h1>
             <p className="text-slate-400 text-sm mt-1">
-              Aaprueba o rechaza los grupos musicales postulados para el catálogo.
+              Aprueba o rechaza los grupos musicales postulados para el catálogo.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-4 py-2 rounded-xl w-fit">
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-medium text-slate-300">
-              Pendientes: <strong className="text-white font-bold">{bandas.length}</strong>
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-4 py-2 rounded-xl w-fit">
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-medium text-slate-300">
+                Pendientes: <strong className="text-white font-bold">{bandas.length}</strong>
+              </span>
+            </div>
+
+            <button
+              onClick={handleCerrarSesion}
+              title="Cerrar sesión"
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/30 rounded-xl text-xs font-medium transition"
+            >
+              <LogOut className="w-4 h-4" /> Salir
+            </button>
           </div>
         </div>
       </div>
