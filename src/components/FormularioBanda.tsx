@@ -22,7 +22,8 @@ import {
   Check,
   Search,
   Eye,
-  EyeOff
+  EyeOff,
+  X
 } from 'lucide-react';
 
 const InstagramIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
@@ -100,7 +101,9 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
 
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
-  const [palabraClave, setPalabraClave] = useState(generarTokenAleatorio());
+  
+  const [palabraClave, setPalabraClave] = useState(''); 
+  const [nuevaPalabraClave, setNuevaPalabraClave] = useState('');
   const [mostrarClave, setMostrarClave] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [genero, setGenero] = useState<string[]>([]);
@@ -121,6 +124,13 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
   const [loading, setLoading] = useState(false);
   const [mensajeEstado, setMensajeEstado] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3>(1);
+
+  // Estados para el Modal de Recuperación por OTP
+  const [mostrarModalRecuperar, setMostrarModalRecuperar] = useState(false);
+  const [pasoRecuperacion, setPasoRecuperacion] = useState<'email' | 'codigo'>('email');
+  const [codigoOTP, setCodigoOTP] = useState('');
+  const [nuevaClavePersonalizada, setNuevaClavePersonalizada] = useState('');
+  const [cargandoOTP, setCargandoOTP] = useState(false);
 
   const activeObjectUrls = useRef<Set<string>>(new Set());
 
@@ -154,15 +164,32 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     setMensajeEstado(null);
 
     try {
-      const claveHash = await generarHash(claveABuscar);
+      const claveLimpia = claveABuscar.trim();
+      const claveHash = await generarHash(claveLimpia);
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('bandas')
         .select('*, integrantes(*), canciones(*)')
         .eq('palabra_clave', claveHash)
         .maybeSingle();
 
       if (error) throw error;
+
+      if (!data) {
+        const { data: bandaVieja } = await supabase
+          .from('bandas')
+          .select('*, integrantes(*), canciones(*)')
+          .eq('palabra_clave', claveLimpia)
+          .maybeSingle();
+
+        if (bandaVieja) {
+          await supabase.rpc('restablecer_clave_banda', {
+            p_banda_id: bandaVieja.id,
+            p_nueva_clave_hash: claveHash,
+          });
+          data = bandaVieja;
+        }
+      }
 
       if (!data) {
         setMensajeEstado({
@@ -184,7 +211,8 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
       setEsModoEdicion(true);
       setNombre(data.nombre || '');
       setEmail(data.email || '');
-      setPalabraClave(claveABuscar);
+      setPalabraClave(claveLimpia);
+      setNuevaPalabraClave('');
       setBio(data.bio || '');
       setHistoria(data.historia || '');
       setColorTema(data.color_tema || '#6366f1');
@@ -242,46 +270,66 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     }
   };
 
-  const recuperarPalabraClave = async () => {
+  // Paso 1 de recuperación: Generar token temporal de 6 dígitos y enviarlo
+  const enviarCodigoRecuperacion = async () => {
     if (!email.trim() || !email.includes('@')) {
-      setMensajeEstado({
-        tipo: 'error',
-        texto: 'Escribe tu correo electrónico en el campo superior para enviarte tu nueva palabra clave.',
-      });
+      setMensajeEstado({ tipo: 'error', texto: 'Ingresa un correo electrónico válido.' });
       return;
     }
 
-    setLoading(true);
+    setCargandoOTP(true);
     setMensajeEstado(null);
 
     try {
-      const emailLimpio = email.trim().toLowerCase();
+      const emailLimpio = email.trim();
+      const nombreLimpio = nombre.trim();
 
-      const { data: banda, error: fetchError } = await supabase
+      // Consultar por email y opcionalmente por nombre de la banda para evitar solapamientos
+      let query = supabase
         .from('bandas')
         .select('id, nombre')
-        .eq('email', emailLimpio)
-        .maybeSingle();
+        .ilike('email', emailLimpio);
 
-      if (fetchError) throw fetchError;
+      if (nombreLimpio) {
+        query = query.ilike('nombre', nombreLimpio);
+      }
+
+      const { data: bandasEncontradas, error } = await query.limit(1);
+
+      if (error) {
+        console.error('Error al consultar la banda en Supabase:', error);
+        throw error;
+      }
+
+      const banda = bandasEncontradas && bandasEncontradas.length > 0 ? bandasEncontradas[0] : null;
 
       if (!banda) {
-        setMensajeEstado({
-          tipo: 'error',
-          texto: 'No encontramos ninguna banda registrada con este correo electrónico.',
+        setMensajeEstado({ 
+          tipo: 'error', 
+          texto: nombreLimpio 
+            ? `No encontramos la banda "${nombreLimpio}" asociada a este correo.` 
+            : 'No encontramos ninguna banda registrada con este correo.' 
         });
+        setCargandoOTP(false);
         return;
       }
 
-      const nuevaClave = generarTokenAleatorio();
-      const nuevaClaveHash = await generarHash(nuevaClave);
+      const tokenOTP = Math.floor(100000 + Math.random() * 900000).toString();
+      const tokenHash = await generarHash(tokenOTP);
+      const expiraEn = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-      const { error: updateError } = await supabase
+      const { error: updateErr } = await supabase
         .from('bandas')
-        .update({ palabra_clave: nuevaClaveHash })
+        .update({
+          token_verificacion_hash: tokenHash,
+          token_expira_en: expiraEn
+        })
         .eq('id', banda.id);
 
-      if (updateError) throw updateError;
+      if (updateErr) {
+        console.error('Error al actualizar token en Supabase:', updateErr);
+        throw updateErr;
+      }
 
       const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
       const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
@@ -292,30 +340,80 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           serviceId,
           templateId,
           {
-            to_email: emailLimpio,
+            to_email: emailLimpio.toLowerCase(),
             nombre_banda: banda.nombre,
-            clave: nuevaClave,
-            fecha_registro: new Date().toLocaleString('es-AR'),
+            codigo_otp: tokenOTP, // Para plantillas que usan {{codigo_otp}}
+            clave: tokenOTP,      // Para plantillas que usan {{clave}}
           },
           publicKey
         );
       }
 
-      setPalabraClave(nuevaClave);
-
-      setMensajeEstado({
-        tipo: 'exito',
-        texto: `¡Nueva palabra clave enviada a ${emailLimpio}! Revisa tu correo e ingrésala para acceder.`,
-      });
-
+      setPasoRecuperacion('codigo');
     } catch (err: any) {
-      console.error('Error al restablecer palabra clave:', err);
-      setMensajeEstado({
-        tipo: 'error',
-        texto: 'Ocurrió un error al intentar generar la nueva palabra clave.',
-      });
+      console.error('Error al enviar código:', err);
+      setMensajeEstado({ tipo: 'error', texto: 'Error al procesar la solicitud. Revisa la consola.' });
     } finally {
-      setLoading(false);
+      setCargandoOTP(false);
+    }
+  };
+
+  // Paso 2 de recuperación: Validar token y guardar la nueva palabra clave personalizada
+  const confirmarNuevaClaveConOTP = async () => {
+    if (!codigoOTP.trim() || nuevaClavePersonalizada.trim().length < 6) {
+      setMensajeEstado({ tipo: 'error', texto: 'El código debe tener 6 dígitos y la clave mínimo 6 caracteres.' });
+      return;
+    }
+
+    setCargandoOTP(true);
+    setMensajeEstado(null);
+
+    try {
+      const emailLimpio = email.trim();
+      const otpHash = await generarHash(codigoOTP.trim());
+
+      const { data: bandasEncontradas, error } = await supabase
+        .from('bandas')
+        .select('id')
+        .ilike('email', emailLimpio)
+        .eq('token_verificacion_hash', otpHash)
+        .gt('token_expira_en', new Date().toISOString())
+        .limit(1);
+
+      if (error) {
+        console.error('Error al validar código en Supabase:', error);
+        throw error;
+      }
+
+      const banda = bandasEncontradas && bandasEncontradas.length > 0 ? bandasEncontradas[0] : null;
+
+      if (!banda) {
+        setMensajeEstado({ tipo: 'error', texto: 'El código es incorrecto o ha expirado.' });
+        setCargandoOTP(false);
+        return;
+      }
+
+      const nuevaClaveHash = await generarHash(nuevaClavePersonalizada.trim());
+      const { error: rpcError } = await supabase.rpc('restablecer_clave_banda', {
+        p_banda_id: banda.id,
+        p_nueva_clave_hash: nuevaClaveHash,
+      });
+
+      if (rpcError) throw rpcError;
+
+      const claveLimpia = nuevaClavePersonalizada.trim();
+      setPalabraClave(claveLimpia);
+      await cargarBandaPorClave(claveLimpia);
+
+      setMostrarModalRecuperar(false);
+      setPasoRecuperacion('email');
+      setCodigoOTP('');
+      setNuevaClavePersonalizada('');
+    } catch (err: any) {
+      console.error('Error al restablecer clave:', err);
+      setMensajeEstado({ tipo: 'error', texto: 'No se pudo actualizar la palabra clave.' });
+    } finally {
+      setCargandoOTP(false);
     }
   };
 
@@ -326,6 +424,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
   }, [palabraClaveEdicion]);
 
   const copiarClave = () => {
+    if (!palabraClave) return;
     navigator.clipboard.writeText(palabraClave);
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
@@ -506,7 +605,19 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     }
 
     if (!palabraClave.trim()) {
-      setMensajeEstado({ tipo: 'error', texto: 'Debes incluir una palabra clave o token para la edición posterior.' });
+      setMensajeEstado({ tipo: 'error', texto: 'Debes ingresar una palabra clave personalizada o autogenerada.' });
+      setPasoActual(1);
+      return;
+    }
+
+    if (!esModoEdicion && palabraClave.trim().length < 6) {
+      setMensajeEstado({ tipo: 'error', texto: 'La palabra clave personalizada debe tener al menos 6 caracteres.' });
+      setPasoActual(1);
+      return;
+    }
+
+    if (esModoEdicion && nuevaPalabraClave.trim() && nuevaPalabraClave.trim().length < 6) {
+      setMensajeEstado({ tipo: 'error', texto: 'La nueva palabra clave debe tener al menos 6 caracteres.' });
       setPasoActual(1);
       return;
     }
@@ -520,7 +631,6 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
     const instagramLimpio = sanitizarInstagramUrl(instagramUrl);
 
     try {
-      const claveHash = await generarHash(claveLimpia);
       let urlPortadaFinal: string | null = portadaPreview; 
 
       if (portadaFile) {
@@ -541,24 +651,37 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
       }
 
       if (esModoEdicion && bandaId) {
-        const { error: updateErr } = await supabase
-          .from('bandas')
-          .update({
-            nombre: nombreLimpio,
-            email: emailLimpio,
-            palabra_clave: claveHash,
-            genero: genero.join(', '),
-            bio: bio.trim(),
-            historia: historia.trim(),
-            color_tema: colorTema,
-            url_portada: urlPortadaFinal,
-            spotify_url: spotifyUrl.trim(),
-            instagram_url: instagramLimpio,
-            youtube_url: youtubeUrl.trim(),
-          })
-          .eq('id', bandaId);
+        const nuevaClaveHash = nuevaPalabraClave.trim()
+          ? await generarHash(nuevaPalabraClave.trim())
+          : undefined;
 
-        if (updateErr) throw updateErr;
+        const { data, error: functionErr } = await supabase.functions.invoke('editar-banda', {
+          body: {
+            id: bandaId,
+            palabra_clave: claveLimpia,
+            nueva_palabra_clave: nuevaClaveHash,
+            nuevos_datos: {
+              nombre: nombreLimpio,
+              email: emailLimpio,
+              genero: genero.join(', '),
+              bio: bio.trim(),
+              historia: historia.trim(),
+              color_tema: colorTema,
+              url_portada: urlPortadaFinal,
+              spotify_url: spotifyUrl.trim(),
+              instagram_url: instagramLimpio,
+              youtube_url: youtubeUrl.trim(),
+            },
+          },
+        });
+
+        if (functionErr) throw new Error(functionErr.message);
+        if (data?.error) throw new Error(data.error);
+
+        if (nuevaPalabraClave.trim()) {
+          setPalabraClave(nuevaPalabraClave.trim());
+          setNuevaPalabraClave('');
+        }
 
         await supabase.from('integrantes').delete().eq('banda_id', bandaId);
 
@@ -639,6 +762,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
           return;
         }
 
+        const claveHash = await generarHash(claveLimpia);
         const tokenVerificacion = crypto.randomUUID();
         const tokenVerificacionHash = await generarHash(tokenVerificacion);
         const tokenExpiraEn = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -815,7 +939,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                 key={paso.id}
                 type="button"
                 onClick={() => setPasoActual(paso.id as any)}
-                className={`flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 rounded-lg text-xs sm:text-sm transition-all text-center ${
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 rounded-lg text-xs sm:text-sm transition-all text-center cursor-pointer ${
                   activo 
                     ? 'bg-white text-slate-900 shadow-lg font-bold' 
                     : 'bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200 backdrop-blur-sm'
@@ -904,9 +1028,11 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                 <div className="mt-1.5 flex justify-end">
                   <button
                     type="button"
-                    onClick={recuperarPalabraClave}
-                    disabled={loading}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline transition bg-transparent border-0 p-0 cursor-pointer disabled:opacity-50"
+                    onClick={() => {
+                      setMostrarModalRecuperar(true);
+                      setPasoRecuperacion('email');
+                    }}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline transition bg-transparent border-0 p-0 cursor-pointer"
                   >
                     ¿Olvidaste tu palabra clave?
                   </button>
@@ -923,7 +1049,8 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                     type={mostrarClave ? "text" : "password"}
                     value={palabraClave}
                     onChange={(e) => setPalabraClave(e.target.value)}
-                    className="w-full bg-indigo-950/40 border border-indigo-500/40 rounded-lg pl-9 pr-36 py-2.5 text-indigo-200 font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    placeholder="Ej: MiBanda2026!"
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-lg pl-9 pr-60 py-2.5 text-slate-100 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                     required
                   />
                   
@@ -932,41 +1059,67 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                       type="button"
                       onClick={() => setMostrarClave(!mostrarClave)}
                       title={mostrarClave ? "Ocultar clave" : "Mostrar clave"}
-                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition"
+                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition cursor-pointer"
                     >
                       {mostrarClave ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPalabraClave(generarTokenAleatorio());
+                        setMostrarClave(true);
+                      }}
+                      title="Generar clave aleatoria"
+                      className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium rounded transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3 text-indigo-400" />
+                      <span className="hidden sm:inline">Aleatoria</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => cargarBandaPorClave(palabraClave)}
                       disabled={cargandoDatos}
-                      title="Cargar datos de esta palabra clave"
-                      className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded transition flex items-center gap-1 disabled:opacity-50"
+                      title="Cargar datos con esta clave"
+                      className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded transition flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                     >
                       {cargandoDatos ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                       <span>Cargar</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setPalabraClave(generarTokenAleatorio())}
-                      title="Generar nueva clave"
-                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
+
                     <button
                       type="button"
                       onClick={copiarClave}
+                      disabled={!palabraClave}
                       title="Copiar palabra clave"
-                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition"
+                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition disabled:opacity-40 cursor-pointer"
                     >
                       {copiado ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  Ingresa tu palabra clave y haz clic en <strong>"Cargar"</strong> para editar tus datos.
+                  Escribe tu propia contraseña personalizada (mínimo 6 caracteres) o haz clic en <strong>"Aleatoria"</strong>.
                 </span>
+
+                {esModoEdicion && (
+                  <div className="mt-4 p-3 bg-slate-800/60 border border-slate-700/60 rounded-lg">
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Cambiar Palabra Clave (Opcional)
+                    </label>
+                    <input
+                      type={mostrarClave ? "text" : "password"}
+                      value={nuevaPalabraClave}
+                      onChange={(e) => setNuevaPalabraClave(e.target.value)}
+                      placeholder="Nueva clave personalizada (mínimo 6 caracteres)"
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Déjalo en blanco si prefieres seguir usando la palabra clave actual.
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1014,7 +1167,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                       key={g}
                       type="button"
                       onClick={() => toggleGenero(g)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                         seleccionado
                           ? 'bg-indigo-600 text-white shadow-md'
                           : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
@@ -1076,7 +1229,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               <button
                 type="button"
                 onClick={agregarIntegrante}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow"
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow cursor-pointer"
               >
                 <Plus className="w-4 h-4" /> Agregar Miembro
               </button>
@@ -1094,7 +1247,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                     <button
                       type="button"
                       onClick={() => eliminarIntegrante(item.id)}
-                      className="absolute top-3 right-3 text-slate-500 hover:text-rose-400 transition"
+                      className="absolute top-3 right-3 text-slate-500 hover:text-rose-400 transition cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1222,7 +1375,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                 <button
                   type="button"
                   onClick={agregarCancion}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow cursor-pointer"
                 >
                   <Plus className="w-4 h-4" /> Añadir Canción
                 </button>
@@ -1261,7 +1414,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
                       <button
                         type="button"
                         onClick={() => eliminarCancion(cancion.id)}
-                        className="p-2 text-slate-500 hover:text-rose-400 transition"
+                        className="p-2 text-slate-500 hover:text-rose-400 transition cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1280,7 +1433,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               <button
                 type="button"
                 onClick={() => setPasoActual((pasoActual - 1) as any)}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" /> Anterior
               </button>
@@ -1292,7 +1445,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               <button
                 type="button"
                 onClick={() => setPasoActual((pasoActual + 1) as any)}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow-lg"
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition shadow-lg cursor-pointer"
               >
                 Siguiente
               </button>
@@ -1300,7 +1453,7 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white rounded-lg text-sm font-semibold transition shadow-lg disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white rounded-lg text-sm font-semibold transition shadow-lg disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading ? (
                   <>
@@ -1317,6 +1470,117 @@ export const FormBanda: React.FC<FormBandaProps> = ({ onVolver, onSuccess, palab
         </div>
 
       </form>
+
+      {/* MODAL PROFESIONAL DE RECUPERACIÓN (OTP) */}
+      {mostrarModalRecuperar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+            
+            <button
+              type="button"
+              onClick={() => setMostrarModalRecuperar(false)}
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 p-1 rounded-lg transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
+                <Key className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Restablecer Palabra Clave</h3>
+                <p className="text-xs text-slate-400">
+                  {pasoRecuperacion === 'email' ? 'Paso 1 de 2: Verificación' : 'Paso 2 de 2: Nueva Clave'}
+                </p>
+              </div>
+            </div>
+
+            {pasoRecuperacion === 'email' ? (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-300">
+                  Ingresa tu correo para recibir un código de seguridad temporal de 6 dígitos.
+                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Correo de la banda</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="contacto@banda.com"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setMostrarModalRecuperar(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cargandoOTP || !email.trim()}
+                    onClick={enviarCodigoRecuperacion}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                  >
+                    {cargandoOTP ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                    Enviar Código
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-300">
+                  Código enviado a <span className="text-indigo-400 font-medium">{email}</span>. Ingrésalo junto a tu nueva clave.
+                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Código de 6 dígitos</label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={codigoOTP}
+                    onChange={(e) => setCodigoOTP(e.target.value)}
+                    placeholder="123456"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2 text-center text-lg font-mono tracking-widest text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Tu Nueva Palabra Clave</label>
+                  <input
+                    type="text"
+                    value={nuevaClavePersonalizada}
+                    onChange={(e) => setNuevaClavePersonalizada(e.target.value)}
+                    placeholder="Escribe tu nueva contraseña"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPasoRecuperacion('email')}
+                    className="text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+                  >
+                    ← Cambiar email
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cargandoOTP || codigoOTP.length < 6 || nuevaClavePersonalizada.length < 6}
+                    onClick={confirmarNuevaClaveConOTP}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                  >
+                    {cargandoOTP ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Guardar y Entrar
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

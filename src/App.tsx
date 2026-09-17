@@ -21,23 +21,22 @@ export default function App() {
   const [mostrarDebug, setMostrarDebug] = useState(false);
 
   useEffect(() => {
+    // 1. Validar si el usuario tiene rol 'admin' al cargar
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsAdmin(!!session);
+      const esAdmin = session?.user?.app_metadata?.role === 'admin';
+      setIsAdmin(Boolean(esAdmin));
     });
 
+    // 2. Escuchar cambios de estado de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const autenticado = !!session;
-      setIsAdmin(autenticado);
-
-      if (!autenticado && vista === 'admin') {
-        setVista('catalogo');
-      }
+      const esAdmin = session?.user?.app_metadata?.role === 'admin';
+      setIsAdmin(Boolean(esAdmin));
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [vista]);
+  }, []);
 
   useEffect(() => {
     async function probarConexion() {
@@ -117,7 +116,6 @@ export default function App() {
           />
         )}
 
-        {/* FormBanda actualizado utilizando onVolver */}
         {vista === 'formulario' && (
           <FormBanda 
             onSuccess={() => handleNavegar('catalogo')}

@@ -6,7 +6,6 @@ interface FooterProps {
   isAdmin: boolean;
   onLogout: () => void;
   onNavegar: (destino: 'formulario' | 'editar' | 'admin' | 'catalogo') => void;
-  // Añadimos opcionalmente los estados de debug por si deseas pasárselos desde App.tsx
   mostrarDebug?: boolean;
   setMostrarDebug?: (valor: boolean) => void;
   testError?: string | boolean | null;
@@ -22,37 +21,6 @@ export default function Footer({
   testError,
   testCount,
 }: FooterProps) {
-  const [mostrarLoginForm, setMostrarLoginForm] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [cargando, setCargando] = useState(false);
-  const [errorLogin, setErrorLogin] = useState<string | null>(null);
-
-  const manejarLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCargando(true);
-    setErrorLogin(null);
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        setErrorLogin('Credenciales inválidas');
-      } else {
-        setMostrarLoginForm(false);
-        setEmail('');
-        setPassword('');
-        // Redirige automáticamente al panel de administración tras ingresar
-        onNavegar('admin');
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión';
-      setErrorLogin(msg);
-    } finally {
-      setCargando(false);
-    }
-  };
-
   return (
     <footer className="w-full bg-card/60 backdrop-blur-md border-t border-border mt-20 text-muted-foreground relative z-20">
       {/* Glow decorativo superior */}
@@ -68,7 +36,6 @@ export default function Footer({
               onClick={() => onNavegar('catalogo')}
               className="flex items-center gap-3 group cursor-pointer text-left focus:outline-none"
             >
-              {/* Renderizado de tu logo de Canva */}
               <img 
                 src={`${import.meta.env.BASE_URL}logo.png`} 
                 alt="Catálogo de Bandas" 
@@ -126,71 +93,15 @@ export default function Footer({
           </p>
 
           {/* Área sutil de Administración */}
-          <div className="relative">
+          <div>
             {!isAdmin ? (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setMostrarLoginForm(!mostrarLoginForm)}
-                  className="text-white/30 hover:text-white/70 text-[11px] tracking-wide transition-colors cursor-pointer select-none"
-                >
-                  Gestión de legajos
-                </button>
-
-                {/* Popover / Formulario Flotante de Login */}
-                {mostrarLoginForm && (
-                  <form
-                    onSubmit={manejarLogin}
-                    className="absolute bottom-8 right-0 p-4 bg-card rounded-xl border border-border flex flex-col gap-3 w-64 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in slide-in-from-bottom-2"
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-bold text-white uppercase tracking-wider">
-                        Acceso Interno
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMostrarLoginForm(false);
-                          setErrorLogin(null);
-                        }}
-                        className="text-xs text-muted-foreground hover:text-white"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {errorLogin && (
-                      <p className="text-[11px] text-destructive bg-destructive/10 p-1.5 rounded border border-destructive/20 text-center font-medium">
-                        {errorLogin}
-                      </p>
-                    )}
-
-                    <input
-                      type="email"
-                      placeholder="Email de gestión"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="p-2 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition-colors"
-                    />
-                    <input
-                      type="password"
-                      placeholder="Contraseña"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="p-2 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition-colors"
-                    />
-                    <button
-                      type="submit"
-                      disabled={cargando}
-                      className="bg-primary hover:opacity-90 text-white py-2 rounded-lg text-xs font-bold transition-opacity cursor-pointer disabled:opacity-50"
-                    >
-                      {cargando ? 'Verificando...' : 'Ingresar'}
-                    </button>
-                  </form>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => onNavegar('admin')}
+                className="text-white/30 hover:text-white/70 text-[11px] tracking-wide transition-colors cursor-pointer select-none"
+              >
+                Gestión de legajos
+              </button>
             ) : (
               <div className="flex items-center gap-3 bg-card/80 px-3 py-1.5 rounded-lg border border-emerald-500/30">
                 <button
@@ -202,7 +113,6 @@ export default function Footer({
                   Panel Admin
                 </button>
 
-                {/* 🟢 BOTÓN DE DEBUG SÓLO PARA ADMINS 🟢 */}
                 {setMostrarDebug && (
                   <button
                     type="button"
